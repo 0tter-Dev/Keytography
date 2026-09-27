@@ -45,10 +45,12 @@ Implementar o gerador de senhas fortes configurável, com exigência de força m
 - Solicitar exclusão de caracteres ambíguos garante que a senha gerada não contém nenhum caractere da lista de ambíguos (ex.: `0`, `O`, `l`, `1`).
 - Solicitar parâmetros que tornam a força mínima inatingível (ex.: tamanho muito curto) retorna um erro claro em vez de uma senha fraca ou um loop infinito.
 - Gerar a mesma requisição de parâmetros múltiplas vezes retorna senhas diferentes entre si (confirma uso de fonte aleatória, não determinística).
+- O job `build` do CI permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
 
 - `dotnet test` cobrindo geração com parâmetros variados, exclusão de caracteres ambíguos, o caso de força mínima inatingível, e verificação estatística básica de não-repetição entre gerações.
+- Confirmar no GitHub Actions que o job `build` passou no PR desta entrega.
 
 ## Documentation Updates
 
