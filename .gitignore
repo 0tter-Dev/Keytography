@@ -1,6 +1,12 @@
-# Baseline agnóstico de stack. Entradas específicas de linguagem/framework
-# (node_modules, __pycache__, bin/obj, target/, etc.) entram quando a stack
-# técnica for decidida (ver docs/PROJECT-ARCHITECTURE.md).
+# .NET (stack decidida em docs/PROJECT-ARCHITECTURE.md)
+bin/
+obj/
+*.user
+
+# Banco SQLite local (nunca commitar dados; migrations continuam versionadas)
+*.db
+*.db-shm
+*.db-wal
 
 # OS
 .DS_Store
