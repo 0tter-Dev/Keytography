@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Keytography.Api/Keytography.Api.csproj" />
+    <Project Path="src/Keytography.Domain/Keytography.Domain.csproj" />
+    <Project Path="src/Keytography.Infrastructure/Keytography.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keytography.Tests/Keytography.Tests.csproj" />
+  </Folder>
+</Solution>
