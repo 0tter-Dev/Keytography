@@ -1,10 +1,10 @@
 ---
 id: keytography-001
-status: active
+status: completed
 type: chore
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: high
 sequence: 1
 depends_on: []
@@ -65,3 +65,16 @@ Aprovado pelo usuário em 2026-09-27, ao definir este como o próximo passo do `
 - Criar `docs/guides/running-locally.md` com os passos para rodar o backend localmente (comandos de build/run/test, pré-requisitos de SDK .NET) — os mesmos comandos usados pelo CI.
 
 ## Outcome
+
+Entregue via [PR #2](https://github.com/0tter-Dev/Keytography/pull/2), mergeado em 2026-09-27T05:57:12Z (commit `253383b`). Branch de implementação: `keytography-001-bootstrap-backend` (commit `f182a08`, único commit).
+
+Validação confirmada duas vezes — na implementação e de forma independente na auditoria pós-merge (`project-audit`), reexecutando tudo a partir do `main` já mergeado:
+
+- `dotnet restore` / `dotnet build --configuration Release`: sem erros nem warnings.
+- `dotnet test --configuration Release`: 1/1 passou (teste de integração do `GET /health` via `WebApplicationFactory`).
+- Execução manual local: `GET /health` retornou 200 com `{"status":"healthy","checks":[{"name":"database","status":"healthy"}]}`; `keytography.db` criado automaticamente na primeira execução via migration do EF Core.
+- Job `build` do CI executando `dotnet restore`/`build`/`test` reais, verde no PR e no push subsequente a `main` (GitHub Actions runs `36298182207` e `36298675952`).
+
+`actual_version_impact: minor` — igual ao `expected_version_impact`, sem divergência a justificar.
+
+Observação não bloqueante da auditoria: a troca de SDK de .NET 9 para .NET 10 (LTS), decidida durante esta entrega, ficou registrada no commit/PR e em `global.json`, mas `docs/PROJECT-ARCHITECTURE.md` ainda não cita a versão exata do .NET na `Selected Technology Direction`. Fica como possível pequeno ajuste futuro, não tratado nesta entrega nem no fechamento.
