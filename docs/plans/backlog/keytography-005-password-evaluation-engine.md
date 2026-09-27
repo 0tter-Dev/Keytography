@@ -48,10 +48,12 @@ Implementar o motor de avaliação de força de senha: mini-diagnóstico modular
 - Cadastrar uma senha idêntica a uma já usada anteriormente na mesma conta (presente no histórico) reduz a nota do critério de reuso especificamente.
 - Editar uma entrada de cofre dispara o recálculo da nota automaticamente, sem chamada manual adicional.
 - Adicionar um novo critério (via um teste que registra um critério de exemplo) e disparar o recálculo retroativo atualiza a nota de entradas pré-existentes de mais de um usuário, sem exigir edição manual de cada uma.
+- O job `build` do CI permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
 
 - `dotnet test` cobrindo cada critério isoladamente, o cálculo da nota média, o recálculo automático em criação/edição, e o recálculo retroativo com múltiplos usuários.
+- Confirmar no GitHub Actions que o job `build` passou no PR desta entrega.
 
 ## Documentation Updates
 

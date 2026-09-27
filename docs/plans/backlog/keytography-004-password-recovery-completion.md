@@ -47,10 +47,12 @@ Concluir o fluxo de "Esqueci minha senha", trocando efetivamente a senha de logi
 - Após a troca, todas as entradas de cofre criadas antes da troca continuam legíveis e idênticas (mesmo conteúdo decifrado) — validado comparando o conteúdo decifrado antes e depois da troca.
 - Um token de reset expirado ou já usado retorna 400/410 (não permite a troca).
 - Tentar logar com a senha antiga após a troca falha (401).
+- O job `build` do CI permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
 
 - `dotnet test` cobrindo: reset com token válido, token expirado, token já usado, e a preservação do conteúdo decifrado do cofre antes/depois da troca.
+- Confirmar no GitHub Actions que o job `build` passou no PR desta entrega.
 
 ## Documentation Updates
 

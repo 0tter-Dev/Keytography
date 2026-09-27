@@ -1,6 +1,6 @@
 ---
 id: keytography-001
-status: backlog
+status: active
 type: chore
 requires_pull_request: true
 expected_version_impact: minor
@@ -31,14 +31,17 @@ Estabelecer o esqueleto executável do backend do Keytography (solução .NET, p
 - Expor um endpoint de health-check (`GET /health`) retornando 200 com um payload mínimo indicando que a API e a conexão com o banco estão operacionais.
 - Estrutura de pastas/camadas coerente com a separação de domínio prevista (ex.: separar API, domínio/aplicação, e acesso a dados em projetos ou pastas distintas) — sem implementar nenhuma capability ainda.
 - Configuração básica de logging.
+- Atualizar `.github/workflows/ci.yml`: substituir o job placeholder por um job real (mantendo o nome `build`, para preservar a configuração de branch protection já feita no GitHub) que executa `dotnet restore`, `dotnet build` e `dotnet test` contra a solução criada neste plano. A partir daqui, esse mesmo job passa a validar automaticamente os planos seguintes (002 a 006) conforme eles adicionam código e testes, sem precisar de nova mudança no workflow a cada plano.
 
 ## Out Of Scope
 
 - Qualquer regra de negócio de autenticação, cofre, avaliação ou geração de senha (planos seguintes).
-- CI/CD, Docker, ou qualquer infraestrutura além do ambiente local de desenvolvimento.
+- Docker ou qualquer infraestrutura de deploy além de compilar/testar em CI.
 - Autenticação/autorização do endpoint de health-check (fica público, sem necessidade de token).
 
 ## Approval
+
+Aprovado pelo usuário em 2026-09-27, ao definir este como o próximo passo do `ROADMAP.md` a ser ativado, imediatamente após a configuração de branch protection no repositório remoto.
 
 ## Acceptance Criteria
 
@@ -47,16 +50,18 @@ Estabelecer o esqueleto executável do backend do Keytography (solução .NET, p
 - Rodar a API localmente e fazer `GET /health` retorna HTTP 200 com um corpo indicando status "ok" (ou equivalente) e que a conexão com o banco SQLite foi validada.
 - O arquivo de banco SQLite é criado automaticamente (via migration do EF Core) na primeira execução, sem passo manual.
 - A estrutura de pastas/projetos reflete a separação entre API, domínio/aplicação, e dados (não um único projeto monolítico misturando tudo).
+- O job `build` do workflow de CI executa `dotnet restore`, `dotnet build` e `dotnet test` de verdade (não mais o placeholder) e passa (verde) no PR desta entrega e no push resultante a `main`.
 
 ## Validation
 
 - `dotnet build`
 - `dotnet test`
 - Execução manual local + `curl http://localhost:<porta>/health` (ou equivalente) confirmando 200.
+- Verificar no GitHub Actions que o job `build` rodou com os comandos reais e passou.
 
 ## Documentation Updates
 
-- `docs/STATUS.md`: marcar o marco de bootstrap concluído.
-- Criar `docs/guides/running-locally.md` com os passos para rodar o backend localmente (comandos de build/run/test, pré-requisitos de SDK .NET).
+- `docs/STATUS.md`: marcar o marco de bootstrap concluído, incluindo que o CI passou a validar de verdade.
+- Criar `docs/guides/running-locally.md` com os passos para rodar o backend localmente (comandos de build/run/test, pré-requisitos de SDK .NET) — os mesmos comandos usados pelo CI.
 
 ## Outcome

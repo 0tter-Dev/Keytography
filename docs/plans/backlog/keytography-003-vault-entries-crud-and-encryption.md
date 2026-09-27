@@ -52,11 +52,13 @@ Implementar o CRUD de entradas de cofre (contas/senhas) com o esquema de criptog
 - Um usuário `Member` tentando ler o cofre de outro usuário via os endpoints normais recebe 403.
 - Um usuário `Admin` consegue ler (não escrever) as entradas de cofre de outro usuário via o endpoint de supervisão; uma tentativa de escrita nesse mesmo endpoint (criar/editar/excluir) retorna 403.
 - Trocar a senha de login do usuário não invalida o acesso às entradas já cifradas — validado por teste que gera uma nova cópia "do dono" da DEK e confirma que a DEK decifrada continua idêntica.
+- O job `build` do CI permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
 
 - `dotnet test` cobrindo criação/leitura/edição/histórico/soft-delete/exclusão definitiva, controle de acesso por role, e o ciclo de cifragem/decifragem das duas cópias da DEK.
 - Inspeção manual do arquivo SQLite confirmando ausência de texto puro nos campos sensíveis.
+- Confirmar no GitHub Actions que o job `build` passou no PR desta entrega.
 
 ## Documentation Updates
 

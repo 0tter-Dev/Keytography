@@ -51,11 +51,13 @@ Implementar autenticação e gestão de usuários: cadastro com verificação de
 - Confirmar o e-mail via o endpoint/token de verificação, e então logar com sucesso, retorna 200 com um JWT válido no corpo.
 - Um endpoint protegido de teste (ex.: `GET /auth/me`) retorna 401 sem token, e 200 com os dados do usuário autenticado quando um JWT válido é enviado.
 - `POST /auth/forgot-password` com um e-mail existente gera um token de reset (verificável em log, dado que o envio real está abstraído) e retorna 200 sem revelar se o e-mail existe (para não vazar quais e-mails estão cadastrados).
+- O job `build` do CI (já executando `dotnet build`/`dotnet test` desde `keytography-001`) permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
 
 - `dotnet test` cobrindo os cenários de registro, bootstrap do Admin, verificação de e-mail, login (sucesso e falha), autorização por role, e solicitação de reset.
 - Testes de integração (in-memory ou SQLite de teste) exercitando os endpoints ponta a ponta.
+- Confirmar no GitHub Actions que o job `build` passou no PR desta entrega.
 
 ## Documentation Updates
 
