@@ -6,7 +6,7 @@ Gerenciar identidade, autenticação e controle de acesso por role dos usuários
 
 ## Current Status
 
-`planned`
+`in_progress` — registro, verificação de e-mail, login com JWT, bootstrap do Admin, e solicitação de redefinição de senha implementados em `keytography-002`. A conclusão da troca de senha (re-wrap da DEK) fica para `keytography-004`.
 
 ## Key Rules
 
