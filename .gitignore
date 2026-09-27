@@ -1,0 +1,27 @@
+# Baseline agnóstico de stack. Entradas específicas de linguagem/framework
+# (node_modules, __pycache__, bin/obj, target/, etc.) entram quando a stack
+# técnica for decidida (ver docs/PROJECT-ARCHITECTURE.md).
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editores/IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Segredos e configuração local
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Diretórios de build/saída genéricos
+/dist/
+/build/
+/out/

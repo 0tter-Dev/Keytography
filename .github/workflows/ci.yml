@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "CI placeholder - sem validacoes reais ainda. Sera substituido por build/test real quando o core (.NET) existir (ver docs/plans/backlog/keytography-001-bootstrap-backend.md)."

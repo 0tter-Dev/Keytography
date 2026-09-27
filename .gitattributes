@@ -1,0 +1,13 @@
+# Normaliza quebras de linha para LF no repositório, convertendo para o
+# padrão do SO na checkout quando o Git estiver configurado para isso.
+* text=auto eol=lf
+
+# Arquivos binários comuns — nunca normalizar, sempre tratar como binário.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
