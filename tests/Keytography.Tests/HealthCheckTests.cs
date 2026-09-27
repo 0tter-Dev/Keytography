@@ -1,10 +1,9 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
+using Keytography.Tests.TestSupport;
 
 namespace Keytography.Tests;
 
-public class HealthCheckTests : IClassFixture<HealthCheckTests.ApiFactory>
+public class HealthCheckTests : IClassFixture<ApiFactory>
 {
     private readonly ApiFactory _factory;
 
@@ -24,30 +23,5 @@ public class HealthCheckTests : IClassFixture<HealthCheckTests.ApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("\"status\":\"healthy\"", body);
         Assert.Contains("\"database\"", body);
-    }
-
-    public class ApiFactory : WebApplicationFactory<Program>, IDisposable
-    {
-        private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"keytography-test-{Guid.NewGuid():N}.db");
-
-        protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
-        {
-            builder.ConfigureAppConfiguration((_, configBuilder) =>
-            {
-                configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:Keytography"] = $"Data Source={_dbPath}"
-                });
-            });
-        }
-
-        public new void Dispose()
-        {
-            base.Dispose();
-            if (File.Exists(_dbPath))
-            {
-                File.Delete(_dbPath);
-            }
-        }
     }
 }

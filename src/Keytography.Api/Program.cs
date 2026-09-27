@@ -1,20 +1,66 @@
+using Keytography.Api.Auth;
+using Keytography.Domain;
 using Keytography.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("Keytography")
-    ?? "Data Source=keytography.db";
-
-builder.Services.AddDbContext<KeytographyDbContext>(options =>
-    options.UseSqlite(connectionString));
+// A leitura da configuracao fica dentro dos callbacks (avaliados na resolucao via DI,
+// depois de builder.Build()) para que overrides de configuracao de teste
+// (WebApplicationFactory.ConfigureWebHost) sejam respeitados corretamente.
+builder.Services.AddDbContext<KeytographyDbContext>((serviceProvider, options) =>
+{
+    var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    var connectionString = configuration.GetConnectionString("Keytography") ?? "Data Source=keytography.db";
+    options.UseSqlite(connectionString);
+});
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<KeytographyDbContext>("database");
 
+builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var jwtKey = builder.Configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException(
+                "Jwt:Key não configurado. Defina via `dotnet user-secrets set \"Jwt:Key\" \"<valor>\"` (ver docs/guides/running-locally.md).");
+        var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Keytography";
+        var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "Keytography";
+
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
+
+// Checagem de "fail-fast": falha alto e cedo se a chave nao estiver configurada,
+// lendo de app.Configuration (ja com os overrides de teste mesclados).
+if (string.IsNullOrEmpty(app.Configuration["Jwt:Key"]))
+{
+    throw new InvalidOperationException(
+        "Jwt:Key não configurado. Defina via `dotnet user-secrets set \"Jwt:Key\" \"<valor>\"` (ver docs/guides/running-locally.md).");
+}
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
@@ -33,6 +79,8 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         await context.Response.WriteAsync(payload);
     }
 });
+
+app.MapAuthEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

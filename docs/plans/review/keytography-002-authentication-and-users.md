@@ -1,6 +1,6 @@
 ---
 id: keytography-002
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -42,6 +42,8 @@ Implementar autenticação e gestão de usuários: cadastro com verificação de
 - Refresh tokens ou revogação de sessão (pode ser adicionado depois sem quebrar este escopo).
 
 ## Approval
+
+Aprovado pelo usuário em 2026-09-27, ao confirmar a conclusão de `keytography-001` e pedir explicitamente para prosseguir com a implementação deste plano.
 
 ## Acceptance Criteria
 

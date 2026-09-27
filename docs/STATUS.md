@@ -2,13 +2,22 @@
 
 ## Current Stage
 
-O Keytography está em fase de planejamento inicial (pré-implementação) desde 2026-09-25 — nenhum código foi escrito ainda. O `PROJECT-BRIEF.md` do kickoff foi consumido e sua documentação agora vive em `docs/`. A identidade do projeto (nome, tagline, direção visual) foi definida em 2026-09-26 e está registrada em [docs/guides/identity.md](./guides/identity.md). O repositório remoto foi criado e o scaffolding básico (`LICENSE` MIT, `.gitignore`, `.gitattributes`, `.editorconfig`, `SECURITY.md`, template de Pull Request) foi estabelecido em seguida, antes do primeiro PR. A stack técnica (C# / ASP.NET Core, EF Core + SQLite) e o esquema de criptografia do cofre ([ADR-0001](./decisions/ADR-0001-vault-encryption-and-recovery.md)) foram decididos, e o trabalho de implementação foi quebrado em planos sequenciados (ver [ROADMAP.md](./ROADMAP.md) e `docs/plans/backlog/`). Um workflow de CI placeholder (`.github/workflows/ci.yml`, sem validações reais) foi adicionado só para permitir configurar branch protection no GitHub com um check já reconhecido; será substituído por build/test real a partir de `keytography-001`. Esta base completa (documentação, scaffolding do repositório, decisões e planos) foi enviada diretamente para `main` por decisão explícita do usuário, como marco zero do projeto — a partir daqui, entregas seguem o fluxo normal de PR. Branch protection na `main` foi configurada pelo usuário em seguida. Em 2026-09-27, [keytography-001](./plans/completed/keytography-001-bootstrap-backend.md) (bootstrap do backend) foi concluído e mergeado ([PR #2](https://github.com/0tter-Dev/Keytography/pull/2)), após auditoria pós-merge sem falhas críticas. Estabeleceu o esqueleto do backend (.NET 10, solução `Keytography.slnx` com os projetos `Keytography.Api`, `Keytography.Domain`, `Keytography.Infrastructure` e `Keytography.Tests`), EF Core com provider SQLite e a migration inicial, o endpoint `GET /health`, e o job `build` do CI evoluído de placeholder para `dotnet restore`/`build`/`test` reais — a primeira linha de código do projeto (ver [docs/guides/running-locally.md](./guides/running-locally.md) para rodar localmente). Próximo plano elegível: `keytography-002`.
+Core/backend em desenvolvimento ativo. [keytography-002](./plans/review/keytography-002-authentication-and-users.md) (autenticação) está em `review` (PR #4 aberto). Próximo plano elegível após o merge: `keytography-003`.
+
+## Milestones
+
+- **2026-09-25** — Kickoff e documentação Nível 3 estabelecidos a partir do `PROJECT-BRIEF.md`.
+- **2026-09-26** — Identidade do projeto definida: [docs/guides/identity.md](./guides/identity.md).
+- **2026-09-26** — Stack técnica e esquema de criptografia do cofre decididos: [ADR-0001](./decisions/ADR-0001-vault-encryption-and-recovery.md).
+- **2026-09-26** — Scaffolding do repositório e base documental completa enviados a `main` (marco zero, push direto autorizado explicitamente pelo usuário); branch protection configurada em seguida.
+- **2026-09-27** — [keytography-001](./plans/completed/keytography-001-bootstrap-backend.md) concluído ([PR #2](https://github.com/0tter-Dev/Keytography/pull/2)): bootstrap do backend (.NET 10, EF Core + SQLite, `GET /health`, CI real). Ver [docs/guides/running-locally.md](./guides/running-locally.md).
+- **2026-09-27** — [keytography-002](./plans/review/keytography-002-authentication-and-users.md) em `review` ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
 
 ## Capability Dashboard
 
 | Capability | Status | Canonical source |
 | --- | --- | --- |
-| Autenticação e Usuários | planned | [authentication-and-users](./capabilities/authentication-and-users/README.md) |
+| Autenticação e Usuários | in_progress | [authentication-and-users](./capabilities/authentication-and-users/README.md) |
 | Entradas de Cofre (Contas/Senhas) | planned | [vault-entries](./capabilities/vault-entries/README.md) |
 | Avaliação de Senha | planned | [password-evaluation](./capabilities/password-evaluation/README.md) |
 | Geração de Senha | planned | [password-generation](./capabilities/password-generation/README.md) |
