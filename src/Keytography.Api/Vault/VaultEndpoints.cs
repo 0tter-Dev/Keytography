@@ -51,12 +51,9 @@ public static class VaultEndpoints
             return SessionExpired();
         }
 
-        if (string.IsNullOrWhiteSpace(request.Title))
+        if (ValidateTitle(request.Title) is { } invalidTitle)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["title"] = ["Título é obrigatório."]
-            });
+            return invalidTitle;
         }
 
         var entry = new VaultEntry
@@ -152,6 +149,11 @@ public static class VaultEndpoints
         if (dek is null)
         {
             return SessionExpired();
+        }
+
+        if (ValidateTitle(request.Title) is { } invalidTitle)
+        {
+            return invalidTitle;
         }
 
         var newPassword = request.Password ?? string.Empty;
@@ -311,6 +313,14 @@ public static class VaultEndpoints
         var dek = RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek);
         return Results.Ok(ToDetail(entry, AesGcmCipher.DecryptString(dek, entry.EncryptedPassword)));
     }
+
+    private static IResult? ValidateTitle(string? title) =>
+        string.IsNullOrWhiteSpace(title)
+            ? Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["title"] = ["Título é obrigatório."]
+            })
+            : null;
 
     private static IResult SessionExpired() => Results.Problem(
         title: "Sessão de cofre expirada.",

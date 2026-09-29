@@ -13,6 +13,7 @@ authorized_capabilities:
   - docs/capabilities/authentication-and-users/README.md
 decision_records:
   - docs/decisions/ADR-0001-vault-encryption-and-recovery.md
+  - docs/decisions/ADR-0002-dek-session-cache.md
 validation: []
 documentation_updates: []
 ---

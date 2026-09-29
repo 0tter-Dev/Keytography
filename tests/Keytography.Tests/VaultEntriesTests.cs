@@ -25,6 +25,24 @@ public class VaultEntriesTests : IDisposable
     }
 
     [Fact]
+    public async Task Updating_entry_with_blank_title_returns_validation_error()
+    {
+        var client = await AuthenticatedClientAsync("heidi", "heidi@example.com", "supersecret1");
+
+        var createResponse = await client.PostAsJsonAsync("/vault/entries",
+            new CreateVaultEntryRequest("Título Original", null, "password", null));
+        var created = await createResponse.Content.ReadFromJsonAsync<VaultEntryDetailResponse>(JsonOptions);
+
+        var updateResponse = await client.PutAsJsonAsync($"/vault/entries/{created!.Id}",
+            new UpdateVaultEntryRequest("   ", null, "password", null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+
+        var unchanged = await client.GetFromJsonAsync<VaultEntryDetailResponse>($"/vault/entries/{created.Id}", JsonOptions);
+        Assert.Equal("Título Original", unchanged!.Title);
+    }
+
+    [Fact]
     public async Task Create_entry_returns_201_and_list_never_exposes_password()
     {
         var client = await AuthenticatedClientAsync("alice", "alice@example.com", "supersecret1");
