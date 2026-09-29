@@ -6,7 +6,7 @@ CRUD das contas e senhas armazenadas no cofre pessoal de cada usuário.
 
 ## Current Status
 
-`planned`
+`implemented` — CRUD completo, criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas por entrada, soft delete/lixeira, e leitura de supervisão do Admin implementados em `keytography-003`. O histórico da senha de *login* do próprio usuário (mencionado nas Key Rules abaixo) só passa a existir quando `keytography-004` implementar a troca efetiva dessa senha — não há hoje nenhum evento que a altere.
 
 ## Key Rules
 
@@ -26,3 +26,4 @@ CRUD das contas e senhas armazenadas no cofre pessoal de cada usuário.
 ## Cross-Cutting Decisions
 
 - [ADR-0001: Criptografia do cofre com chave dupla e recuperação de acesso](../../decisions/ADR-0001-vault-encryption-and-recovery.md) — define o esquema de criptografia usado por este módulo.
+- [ADR-0002: Cache em memória da DEK por sessão](../../decisions/ADR-0002-dek-session-cache.md) — define como este módulo obtém a DEK já decifrada para operações do dono (via cache) e da supervisão do Admin (via chave de recuperação, sem cache).

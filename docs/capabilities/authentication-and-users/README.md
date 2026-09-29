@@ -6,7 +6,7 @@ Gerenciar identidade, autenticação e controle de acesso por role dos usuários
 
 ## Current Status
 
-`in_progress` — registro, verificação de e-mail, login com JWT, bootstrap do Admin, e solicitação de redefinição de senha implementados em `keytography-002`. A conclusão da troca de senha (re-wrap da DEK) fica para `keytography-004`.
+`in_progress` — registro, verificação de e-mail, login com JWT, bootstrap do Admin, e solicitação de redefinição de senha implementados em `keytography-002`. Desde `keytography-003`, registro e login também disparam o ciclo de vida da DEK do cofre (ver Key Rules abaixo e [ADR-0002](../../decisions/ADR-0002-dek-session-cache.md)). A conclusão da troca de senha (re-wrap da DEK) fica para `keytography-004`.
 
 ## Key Rules
 
@@ -16,10 +16,13 @@ Gerenciar identidade, autenticação e controle de acesso por role dos usuários
 - Somente o dono de um cofre pode adicionar ou editar suas próprias contas/senhas — a permissão de leitura do `Admin` sobre outros cofres nunca inclui escrita.
 - O primeiro usuário registrado no sistema recebe a role `Admin` automaticamente. Todos os cadastros seguintes recebem `Member` por padrão.
 - Fluxo de "Esqueci minha senha" baseado na validação por e-mail feita no cadastro. A conclusão da troca de senha depende do esquema de recuperação de chave definido em [ADR-0001](../../decisions/ADR-0001-vault-encryption-and-recovery.md): a senha de login pode ser trocada sem perda de acesso ao cofre.
+- No registro, a senha em texto puro (disponível só neste momento e no login) é usada para gerar a DEK do cofre e cifrar sua cópia "do dono" — ver [vault-entries](../vault-entries/README.md) e [ADR-0001](../../decisions/ADR-0001-vault-encryption-and-recovery.md).
+- No login, a mesma senha é usada para desfazer a cópia "do dono" da DEK, que fica em cache em memória (nunca em disco) pelo tempo de vida do JWT, para as operações de cofre da sessão — ver [ADR-0002](../../decisions/ADR-0002-dek-session-cache.md).
 
 ## Cross-Cutting Decisions
 
 - [ADR-0001: Criptografia do cofre com chave dupla e recuperação de acesso](../../decisions/ADR-0001-vault-encryption-and-recovery.md) — define como o acesso de supervisão do `Admin` e a recuperação de senha funcionam sem exigir uma "master password" separada.
+- [ADR-0002: Cache em memória da DEK por sessão](../../decisions/ADR-0002-dek-session-cache.md) — define como o registro e o login deste módulo entregam a DEK decifrada para as operações de cofre da sessão.
 
 ## Main Relationships
 

@@ -32,6 +32,7 @@ public static class AuthEndpoints
         RegisterRequest request,
         KeytographyDbContext db,
         IEmailSender emailSender,
+        IRecoveryKeyProvider recoveryKeyProvider,
         CancellationToken cancellationToken)
     {
         var login = request.Login?.Trim() ?? string.Empty;
@@ -78,6 +79,20 @@ public static class AuthEndpoints
         var verificationToken = CreateToken(user.Id, UserTokenPurpose.EmailVerification, EmailVerificationTokenLifetimeHours);
         db.UserTokens.Add(verificationToken);
 
+        // Geracao da DEK e das duas copias cifradas conforme ADR-0001. Feito aqui porque
+        // a senha em texto puro so existe neste momento (e no login); apos autenticado via
+        // JWT, o servidor nunca mais a ve.
+        var dek = RandomNumberGenerator.GetBytes(AesGcmCipher.KeySizeBytes);
+        var salt = Argon2IdKdf.GenerateSalt();
+        var ownerKey = Argon2IdKdf.DeriveKey(password, salt);
+        db.VaultKeys.Add(new VaultKey
+        {
+            UserId = user.Id,
+            Argon2Salt = salt,
+            OwnerWrappedDek = AesGcmCipher.Encrypt(ownerKey, dek),
+            RecoveryWrappedDek = RsaEnvelope.Wrap(recoveryKeyProvider.Key, dek)
+        });
+
         await db.SaveChangesAsync(cancellationToken);
 
         await emailSender.SendAsync(
@@ -118,12 +133,14 @@ public static class AuthEndpoints
         LoginRequest request,
         KeytographyDbContext db,
         IConfiguration configuration,
+        IDekCache dekCache,
         CancellationToken cancellationToken)
     {
         var login = request.Login?.Trim() ?? string.Empty;
+        var password = request.Password ?? string.Empty;
         var user = await db.Users.FirstOrDefaultAsync(u => u.Login == login, cancellationToken);
 
-        if (user is null || !PasswordHasher.Verify(request.Password ?? string.Empty, user.PasswordHash))
+        if (user is null || !PasswordHasher.Verify(password, user.PasswordHash))
         {
             return Results.Unauthorized();
         }
@@ -137,6 +154,18 @@ public static class AuthEndpoints
         }
 
         var (token, expiresAt) = IssueJwt(user, configuration);
+
+        // Desfaz a DEK usando a copia "do dono" (unica vez em que a senha em texto puro
+        // esta disponivel) e mantem em cache pelo tempo de vida do JWT, para as
+        // operacoes de cofre da sessao (ver ADR-0001 e a decisao de cache em memoria).
+        var vaultKey = await db.VaultKeys.FirstOrDefaultAsync(k => k.UserId == user.Id, cancellationToken);
+        if (vaultKey is not null)
+        {
+            var ownerKey = Argon2IdKdf.DeriveKey(password, vaultKey.Argon2Salt);
+            var dek = AesGcmCipher.Decrypt(ownerKey, vaultKey.OwnerWrappedDek);
+            dekCache.Set(user.Id, dek, expiresAt - DateTimeOffset.UtcNow);
+        }
+
         return Results.Ok(new LoginResponse(token, expiresAt));
     }
 
@@ -168,7 +197,7 @@ public static class AuthEndpoints
 
     private static async Task<IResult> GetMeAsync(ClaimsPrincipal claimsPrincipal, KeytographyDbContext db, CancellationToken cancellationToken)
     {
-        var userId = Guid.Parse(claimsPrincipal.FindFirstValue(JwtRegisteredClaimNames.Sub)!);
+        var userId = claimsPrincipal.GetUserId();
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
         return user is null
