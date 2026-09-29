@@ -4,10 +4,9 @@
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| high | Autenticação e cadastro de usuários | [keytography-002](./plans/review/keytography-002-authentication-and-users.md) — **review** (PR aberto) |
-| high | Entradas de cofre: CRUD e criptografia | [keytography-003](./plans/backlog/keytography-003-vault-entries-crud-and-encryption.md) — depende de keytography-002 |
+| high | Entradas de cofre: CRUD e criptografia | [keytography-003](./plans/backlog/keytography-003-vault-entries-crud-and-encryption.md) — depende de keytography-002 (completed), agora o próximo elegível |
 | medium | Conclusão da recuperação de senha | [keytography-004](./plans/backlog/keytography-004-password-recovery-completion.md) — depende de keytography-002 e keytography-003 |
 | medium | Motor de avaliação de força de senha | [keytography-005](./plans/backlog/keytography-005-password-evaluation-engine.md) — depende de keytography-003 |
 | medium | Gerador de senha | [keytography-006](./plans/backlog/keytography-006-password-generator.md) — depende de keytography-005 |
 
-`keytography-001` (bootstrap do backend) foi concluído em 2026-09-27 — ver [docs/plans/completed/keytography-001-bootstrap-backend.md](./plans/completed/keytography-001-bootstrap-backend.md). `keytography-002` foi promovido a `active` em 2026-09-27 e sua implementação está em `review` (PR aberto). Os demais permanecem em `backlog` — promoção exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-001` e `keytography-002` foram concluídos — ver [docs/plans/completed/](./plans/completed/). Os itens acima permanecem em `backlog` — promoção exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
