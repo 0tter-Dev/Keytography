@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend em desenvolvimento ativo. `keytography-001` e `keytography-002` concluídos. `keytography-003` (entradas de cofre) está em `review` (PR aberto).
+Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002` e `keytography-003` concluídos.
 
 ## Milestones
 
@@ -12,7 +12,7 @@ Core/backend em desenvolvimento ativo. `keytography-001` e `keytography-002` con
 - **2026-09-26** — Scaffolding do repositório e base documental completa enviados a `main` (marco zero, push direto autorizado explicitamente pelo usuário); branch protection configurada em seguida.
 - **2026-09-27** — [keytography-001](./plans/completed/keytography-001-bootstrap-backend.md) concluído ([PR #2](https://github.com/0tter-Dev/Keytography/pull/2)): bootstrap do backend (.NET 10, EF Core + SQLite, `GET /health`, CI real). Ver [docs/guides/running-locally.md](./guides/running-locally.md).
 - **2026-09-27** — [keytography-002](./plans/completed/keytography-002-authentication-and-users.md) concluído ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
-- **2026-09-29** — [keytography-003](./plans/review/keytography-003-vault-entries-crud-and-encryption.md) em `review` (PR aberto): CRUD de entradas de cofre com criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas, soft delete/lixeira, e leitura de supervisão do `Admin`.
+- **2026-09-29** — [keytography-003](./plans/completed/keytography-003-vault-entries-crud-and-encryption.md) concluído ([PR #6](https://github.com/0tter-Dev/Keytography/pull/6)): CRUD de entradas de cofre com criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas, soft delete/lixeira, leitura de supervisão do `Admin`, e cache de DEK em sessão ([ADR-0002](./decisions/ADR-0002-dek-session-cache.md)).
 
 ## Capability Dashboard
 
