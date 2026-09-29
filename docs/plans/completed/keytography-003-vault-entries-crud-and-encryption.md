@@ -1,10 +1,10 @@
 ---
 id: keytography-003
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: high
 sequence: 3
 depends_on: [keytography-002]
@@ -69,3 +69,5 @@ Aprovado pelo usuário em 2026-09-29, ao pedir explicitamente para prosseguir co
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
+
+Entregue via [PR #6](https://github.com/0tter-Dev/Keytography/pull/6), mergeada em `main` no commit `b7bebac` em 2026-09-29. Commits: `1941322` (implementação), `97038d6` (correções de achados da `project-audit`: documentação de capability de `authentication-and-users`, formalização de `ADR-0002` para o cache de DEK em sessão, e validação de título vazio em `UpdateAsync`). CI (`build`) passou (42s). Validação local: `dotnet test` com 16/16 testes passando (Debug e Release), cobrindo criação/leitura/edição/histórico/soft-delete/exclusão definitiva, controle de acesso por role (`Member`/`Admin`), e o ciclo de cifragem/decifragem das duas cópias da DEK; inspeção manual do arquivo SQLite confirmou ausência de texto puro nos campos sensíveis. `actual_version_impact: minor` — coerente com `expected_version_impact`, sem divergência a justificar (nova funcionalidade aditiva, sem breaking changes em contratos existentes).
