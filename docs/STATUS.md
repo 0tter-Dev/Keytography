@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend em desenvolvimento ativo. [keytography-002](./plans/review/keytography-002-authentication-and-users.md) (autenticação) está em `review` (PR #4 aberto). Próximo plano elegível após o merge: `keytography-003`.
+Core/backend em desenvolvimento ativo. `keytography-001` e `keytography-002` concluídos. Próximo plano elegível: `keytography-003`.
 
 ## Milestones
 
@@ -11,7 +11,7 @@ Core/backend em desenvolvimento ativo. [keytography-002](./plans/review/keytogra
 - **2026-09-26** — Stack técnica e esquema de criptografia do cofre decididos: [ADR-0001](./decisions/ADR-0001-vault-encryption-and-recovery.md).
 - **2026-09-26** — Scaffolding do repositório e base documental completa enviados a `main` (marco zero, push direto autorizado explicitamente pelo usuário); branch protection configurada em seguida.
 - **2026-09-27** — [keytography-001](./plans/completed/keytography-001-bootstrap-backend.md) concluído ([PR #2](https://github.com/0tter-Dev/Keytography/pull/2)): bootstrap do backend (.NET 10, EF Core + SQLite, `GET /health`, CI real). Ver [docs/guides/running-locally.md](./guides/running-locally.md).
-- **2026-09-27** — [keytography-002](./plans/review/keytography-002-authentication-and-users.md) em `review` ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
+- **2026-09-27** — [keytography-002](./plans/completed/keytography-002-authentication-and-users.md) concluído ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
 
 ## Capability Dashboard
 

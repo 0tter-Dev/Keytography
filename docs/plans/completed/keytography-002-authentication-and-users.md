@@ -1,10 +1,10 @@
 ---
 id: keytography-002
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: high
 sequence: 2
 depends_on: [keytography-001]
@@ -67,3 +67,11 @@ Aprovado pelo usuário em 2026-09-27, ao confirmar a conclusão de `keytography-
 - `docs/STATUS.md`: refletir o novo status da capability no dashboard.
 
 ## Outcome
+
+Entregue via [PR #4](https://github.com/0tter-Dev/Keytography/pull/4), mergeado em 2026-09-27T23:27:06Z (commit `da547df`). Branch de implementação: `keytography-002-authentication-and-users`, três commits — `f3bf0e3` (ativação do plano), `d27a2d3` (implementação: entidades `User`/`UserToken`, `PasswordHasher`, `IEmailSender`/`LoggingEmailSender`, endpoints de auth, migration `AddUsersAndTokens`, 6 testes novos), e `5f8ae03` (ajuste pós-`project-audit`: corrigiu a deriva de `status` do front matter e reestruturou `docs/STATUS.md` em um dashboard mais compacto).
+
+Validação: `project-audit` rodou como gate pré-merge sobre o PR já com o commit de ajuste incluído — todos os itens sempre-aplicáveis do checklist passaram (critérios de aceite reverificados via `dotnet test` — 7/7 — e via fluxo manual completo com `curl`; nenhum escopo além de `authorized_capabilities`; links resolvem; nenhuma ADR implícita pendente). Dois bugs reais foram encontrados e corrigidos durante a própria implementação (antes da auditoria): leitura eager de configuração que quebrava o isolamento de banco entre testes, e remapeamento de claims do JWT (`MapInboundClaims`) que quebrava `/auth/me` — ambos documentados no commit `d27a2d3`.
+
+`actual_version_impact: minor` — igual ao `expected_version_impact`, sem divergência a justificar.
+
+Achado de processo (não bloqueante, corrigido no commit `5f8ae03` deste mesmo PR): o front matter chegou a ficar com `status: active` enquanto o arquivo já estava fisicamente em `review/` — segunda ocorrência do mesmo problema (a primeira foi em `keytography-001`). Fica registrado aqui como lembrete para atualizar o campo `status` no mesmo momento do `git mv` para `review/`, em entregas futuras.
