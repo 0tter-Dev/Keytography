@@ -1,6 +1,6 @@
 ---
 id: keytography-003
-status: backlog
+status: active
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -42,6 +42,8 @@ Implementar o CRUD de entradas de cofre (contas/senhas) com o esquema de criptog
 - Período de retenção automática da lixeira (fica manual por enquanto, exclusão definitiva é sempre uma ação explícita do usuário).
 
 ## Approval
+
+Aprovado pelo usuário em 2026-09-29, ao pedir explicitamente para prosseguir com o próximo passo do `ROADMAP.md` (este plano). O esquema de criptografia implementado aqui (DEK AES-256-GCM, dupla cifragem via Argon2id + RSA-OAEP) já havia sido aprovado em detalhe na decisão do `ADR-0001`; nenhum desvio ou detalhe técnico novo além do já especificado ali foi introduzido sem sinalizar.
 
 ## Acceptance Criteria
 
