@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend em desenvolvimento ativo. `keytography-001` e `keytography-002` concluídos. Próximo plano elegível: `keytography-003`.
+Core/backend em desenvolvimento ativo. `keytography-001` e `keytography-002` concluídos. `keytography-003` (entradas de cofre) está em `review` (PR aberto).
 
 ## Milestones
 
@@ -12,12 +12,13 @@ Core/backend em desenvolvimento ativo. `keytography-001` e `keytography-002` con
 - **2026-09-26** — Scaffolding do repositório e base documental completa enviados a `main` (marco zero, push direto autorizado explicitamente pelo usuário); branch protection configurada em seguida.
 - **2026-09-27** — [keytography-001](./plans/completed/keytography-001-bootstrap-backend.md) concluído ([PR #2](https://github.com/0tter-Dev/Keytography/pull/2)): bootstrap do backend (.NET 10, EF Core + SQLite, `GET /health`, CI real). Ver [docs/guides/running-locally.md](./guides/running-locally.md).
 - **2026-09-27** — [keytography-002](./plans/completed/keytography-002-authentication-and-users.md) concluído ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
+- **2026-09-29** — [keytography-003](./plans/review/keytography-003-vault-entries-crud-and-encryption.md) em `review` (PR aberto): CRUD de entradas de cofre com criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas, soft delete/lixeira, e leitura de supervisão do `Admin`.
 
 ## Capability Dashboard
 
 | Capability | Status | Canonical source |
 | --- | --- | --- |
 | Autenticação e Usuários | in_progress | [authentication-and-users](./capabilities/authentication-and-users/README.md) |
-| Entradas de Cofre (Contas/Senhas) | planned | [vault-entries](./capabilities/vault-entries/README.md) |
+| Entradas de Cofre (Contas/Senhas) | implemented | [vault-entries](./capabilities/vault-entries/README.md) |
 | Avaliação de Senha | planned | [password-evaluation](./capabilities/password-evaluation/README.md) |
 | Geração de Senha | planned | [password-generation](./capabilities/password-generation/README.md) |

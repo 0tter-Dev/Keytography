@@ -1,4 +1,5 @@
 using Keytography.Api.Auth;
+using Keytography.Api.Vault;
 using Keytography.Domain;
 using Keytography.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -24,6 +25,10 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<KeytographyDbContext>("database");
 
 builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IDekCache, MemoryDekCache>();
+builder.Services.AddSingleton<IRecoveryKeyProvider, RecoveryKeyProvider>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -59,6 +64,10 @@ if (string.IsNullOrEmpty(app.Configuration["Jwt:Key"]))
         "Jwt:Key não configurado. Defina via `dotnet user-secrets set \"Jwt:Key\" \"<valor>\"` (ver docs/guides/running-locally.md).");
 }
 
+// Forca a construcao aqui (fail-fast): valida e faz o parse do PEM logo no startup,
+// em vez de falhar de forma tardia e confusa na primeira operacao de cofre.
+app.Services.GetRequiredService<IRecoveryKeyProvider>();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -81,6 +90,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 });
 
 app.MapAuthEndpoints();
+app.MapVaultEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

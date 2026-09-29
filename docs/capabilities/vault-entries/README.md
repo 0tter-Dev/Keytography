@@ -6,7 +6,7 @@ CRUD das contas e senhas armazenadas no cofre pessoal de cada usuário.
 
 ## Current Status
 
-`planned`
+`implemented` — CRUD completo, criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas por entrada, soft delete/lixeira, e leitura de supervisão do Admin implementados em `keytography-003`. O histórico da senha de *login* do próprio usuário (mencionado nas Key Rules abaixo) só passa a existir quando `keytography-004` implementar a troca efetiva dessa senha — não há hoje nenhum evento que a altere.
 
 ## Key Rules
 

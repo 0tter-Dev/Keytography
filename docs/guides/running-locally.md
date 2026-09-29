@@ -7,7 +7,7 @@ Passos para compilar, testar e rodar o backend do Keytography localmente. São o
 ## Pré-requisitos
 
 - .NET SDK 10 (a versão exata é fixada em [global.json](../../global.json)).
-- Uma chave de assinatura JWT configurada localmente via user-secrets (nunca commitada) — ver seção [Segredos locais (JWT)](#segredos-locais-jwt) abaixo. Sem isso, a API falha ao iniciar com um erro claro.
+- Uma chave de assinatura JWT e um par de chaves RSA de recuperação configurados localmente via user-secrets (nunca commitados) — ver seções [Segredos locais (JWT)](#segredos-locais-jwt) e [Segredos locais (chave de recuperação do cofre)](#segredos-locais-chave-de-recuperação-do-cofre) abaixo. Sem isso, a API falha ao iniciar com um erro claro.
 
 ## Steps
 
@@ -45,6 +45,18 @@ dotnet user-secrets set "Jwt:Audience" "Keytography.Dev"
 ```
 
 Sem `Jwt:Key` configurado, a API lança uma exceção clara no startup em vez de subir silenciosamente insegura. Os testes automatizados (`dotnet test`) não precisam disso — usam uma chave de teste fixa via configuração isolada por teste.
+
+## Segredos locais (chave de recuperação do cofre)
+
+O esquema de criptografia do cofre (`keytography-003`, [ADR-0001](../decisions/ADR-0001-vault-encryption-and-recovery.md)) exige um par de chaves RSA-OAEP (mínimo 3072 bits) do sistema. A chave privada nunca é commitada — é configurada via user-secrets como PEM:
+
+```
+dotnet user-secrets set "Recovery:PrivateKeyPem" "$(openssl genrsa 3072 2>/dev/null || echo '<cole aqui o PEM gerado por outro meio>')"
+```
+
+Ou, sem `openssl`, gere via .NET (`RSA.Create(3072).ExportRSAPrivateKeyPem()`) em um script descartável e cole o resultado no comando acima. Sem `Recovery:PrivateKeyPem` configurado, a API lança uma exceção clara no startup. Os testes automatizados geram sua própria chave descartável a cada execução — não precisam desta configuração.
+
+**Atenção:** esta é a chave mais sensível do sistema — quem a possui pode decifrar o cofre de qualquer usuário (ver "Consequences" no ADR-0001). Em ambiente local isso é aceitável; a proteção adequada dela em produção ainda precisa ser desenhada.
 
 ## Ferramentas locais (dotnet-ef)
 
