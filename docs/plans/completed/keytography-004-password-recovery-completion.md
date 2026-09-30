@@ -1,10 +1,10 @@
 ---
 id: keytography-004
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: patch
-actual_version_impact: pending
+actual_version_impact: patch
 priority: medium
 sequence: 4
 depends_on: [keytography-002, keytography-003]
@@ -67,3 +67,5 @@ Aprovado pelo usuário em 2026-09-29, ao pedir explicitamente para prosseguir co
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
+
+Entregue via [PR #8](https://github.com/0tter-Dev/Keytography/pull/8), mergeada em `main` no commit `2ceda3e` em 2026-09-30. Commit de implementação: `929b419` (endpoint `POST /auth/reset-password`, re-wrap da DEK via chave de recuperação RSA, e o histórico de senha de login `UserPasswordHistory` incluído via emenda de escopo aprovada durante a implementação — ver `Approval`). CI (`build`) passou. Auditado via `project-audit` antes do merge, sem achados bloqueantes (Acceptance Criteria, fidelidade documental, metadados do plano, escopo, links e ADRs implícitas todos `PASS`). Validação local: `dotnet test` com 21/21 testes passando (Debug e Release), cobrindo reset com token válido/expirado/já usado, preservação do conteúdo decifrado do cofre após a troca, e criação do registro de histórico. `actual_version_impact: patch` — coerente com `expected_version_impact`, sem divergência a justificar (novo endpoint completando um fluxo parcial já existente, sem breaking changes).
