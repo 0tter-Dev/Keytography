@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Keytography.Domain;
+using Keytography.Domain.PasswordEvaluation;
 using Keytography.Domain.Security;
 using Keytography.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,7 @@ public static class VaultEndpoints
         ClaimsPrincipal claimsPrincipal,
         KeytographyDbContext db,
         IDekCache dekCache,
+        IEnumerable<IPasswordEvaluationCriterion> criteria,
         CancellationToken cancellationToken)
     {
         var userId = claimsPrincipal.GetUserId();
@@ -56,19 +58,24 @@ public static class VaultEndpoints
             return invalidTitle;
         }
 
+        var password = request.Password ?? string.Empty;
         var entry = new VaultEntry
         {
             UserId = userId,
             Title = request.Title,
             Login = request.Login,
-            EncryptedPassword = AesGcmCipher.EncryptString(dek, request.Password ?? string.Empty),
+            EncryptedPassword = AesGcmCipher.EncryptString(dek, password),
             AdditionalFieldsJson = SerializeFields(request.AdditionalFields)
         };
+
+        var otherPasswords = await PasswordEvaluationSupport.GetOtherPasswordsForUserAsync(db, userId, entry.Id, dek, cancellationToken);
+        var evaluation = PasswordEvaluator.Evaluate(new PasswordEvaluationContext(password, [], otherPasswords), criteria);
+        PasswordEvaluationSupport.ApplyEvaluation(entry, evaluation);
 
         db.VaultEntries.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
 
-        return Results.Created($"/vault/entries/{entry.Id}", ToDetail(entry, request.Password ?? string.Empty));
+        return Results.Created($"/vault/entries/{entry.Id}", ToDetail(entry, password));
     }
 
     private static async Task<IResult> ListAsync(
@@ -130,6 +137,7 @@ public static class VaultEndpoints
         ClaimsPrincipal claimsPrincipal,
         KeytographyDbContext db,
         IDekCache dekCache,
+        IEnumerable<IPasswordEvaluationCriterion> criteria,
         CancellationToken cancellationToken)
     {
         var userId = claimsPrincipal.GetUserId();
@@ -159,6 +167,12 @@ public static class VaultEndpoints
         var newPassword = request.Password ?? string.Empty;
         var currentPassword = AesGcmCipher.DecryptString(dek, entry.EncryptedPassword);
 
+        var thisEntryHistory = (await db.VaultEntryHistories
+            .Where(h => h.VaultEntryId == entry.Id)
+            .ToListAsync(cancellationToken))
+            .Select(h => AesGcmCipher.DecryptString(dek, h.EncryptedPassword))
+            .ToList();
+
         if (currentPassword != newPassword)
         {
             db.VaultEntryHistories.Add(new VaultEntryHistory
@@ -167,12 +181,17 @@ public static class VaultEndpoints
                 EncryptedPassword = entry.EncryptedPassword
             });
             entry.EncryptedPassword = AesGcmCipher.EncryptString(dek, newPassword);
+            thisEntryHistory.Add(currentPassword);
         }
 
         entry.Title = request.Title;
         entry.Login = request.Login;
         entry.AdditionalFieldsJson = SerializeFields(request.AdditionalFields);
         entry.UpdatedAt = DateTimeOffset.UtcNow;
+
+        var otherPasswords = await PasswordEvaluationSupport.GetOtherPasswordsForUserAsync(db, userId, entry.Id, dek, cancellationToken);
+        var evaluation = PasswordEvaluator.Evaluate(new PasswordEvaluationContext(newPassword, thisEntryHistory, otherPasswords), criteria);
+        PasswordEvaluationSupport.ApplyEvaluation(entry, evaluation);
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -334,7 +353,9 @@ public static class VaultEndpoints
         password,
         DeserializeFields(entry.AdditionalFieldsJson),
         entry.CreatedAt,
-        entry.UpdatedAt);
+        entry.UpdatedAt,
+        entry.PasswordScore,
+        PasswordEvaluationSupport.DeserializeScoreDetail(entry.PasswordScoreDetailJson));
 
     private static string? SerializeFields(Dictionary<string, string>? fields) =>
         fields is null || fields.Count == 0 ? null : JsonSerializer.Serialize(fields);
