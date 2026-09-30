@@ -25,6 +25,7 @@ public static class AuthEndpoints
         group.MapPost("/verify-email", VerifyEmailAsync);
         group.MapPost("/login", LoginAsync);
         group.MapPost("/forgot-password", ForgotPasswordAsync);
+        group.MapPost("/reset-password", ResetPasswordAsync);
         group.MapGet("/me", GetMeAsync).RequireAuthorization();
     }
 
@@ -193,6 +194,55 @@ public static class AuthEndpoints
 
         // Resposta identica exista ou nao o e-mail, para nao revelar quais e-mails estao cadastrados.
         return Results.Ok(new { message = "Se o e-mail existir, um token de redefinição foi enviado." });
+    }
+
+    private static async Task<IResult> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        KeytographyDbContext db,
+        IRecoveryKeyProvider recoveryKeyProvider,
+        CancellationToken cancellationToken)
+    {
+        var newPassword = request.NewPassword ?? string.Empty;
+        if (newPassword.Length < 8)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["newPassword"] = ["Senha deve ter ao menos 8 caracteres."]
+            });
+        }
+
+        var token = await db.UserTokens.FirstOrDefaultAsync(
+            t => t.Token == request.Token && t.Purpose == UserTokenPurpose.PasswordReset,
+            cancellationToken);
+
+        if (token is null || !token.IsValid(DateTimeOffset.UtcNow))
+        {
+            return Results.BadRequest(new { message = "Token de redefinição inválido ou expirado." });
+        }
+
+        var user = await db.Users.FirstAsync(u => u.Id == token.UserId, cancellationToken);
+        var vaultKey = await db.VaultKeys.FirstAsync(k => k.UserId == user.Id, cancellationToken);
+
+        // Desfaz a DEK pela copia de recuperacao (chave RSA do sistema) e gera uma nova
+        // copia "do dono" cifrada com a chave derivada da nova senha - o mesmo material de
+        // DEK e preservado, entao o conteudo ja cifrado do cofre continua legivel (ADR-0001).
+        var dek = RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek);
+        var newSalt = Argon2IdKdf.GenerateSalt();
+        var newOwnerKey = Argon2IdKdf.DeriveKey(newPassword, newSalt);
+        vaultKey.Argon2Salt = newSalt;
+        vaultKey.OwnerWrappedDek = AesGcmCipher.Encrypt(newOwnerKey, dek);
+
+        db.UserPasswordHistories.Add(new UserPasswordHistory
+        {
+            UserId = user.Id,
+            PasswordHash = user.PasswordHash
+        });
+        user.PasswordHash = PasswordHasher.Hash(newPassword);
+        token.UsedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Results.Ok(new { message = "Senha redefinida com sucesso." });
     }
 
     private static async Task<IResult> GetMeAsync(ClaimsPrincipal claimsPrincipal, KeytographyDbContext db, CancellationToken cancellationToken)

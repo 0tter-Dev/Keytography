@@ -4,8 +4,8 @@
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | Conclusão da recuperação de senha | [keytography-004](./plans/backlog/keytography-004-password-recovery-completion.md) — depende de keytography-002 e keytography-003 |
+| medium | Conclusão da recuperação de senha | [keytography-004](./plans/review/keytography-004-password-recovery-completion.md) — **review** (PR aberto) |
 | medium | Motor de avaliação de força de senha | [keytography-005](./plans/backlog/keytography-005-password-evaluation-engine.md) — depende de keytography-003 |
 | medium | Gerador de senha | [keytography-006](./plans/backlog/keytography-006-password-generator.md) — depende de keytography-005 |
 
-`keytography-001`, `keytography-002` e `keytography-003` foram concluídos — ver [docs/plans/completed/](./plans/completed/). Os demais permanecem em `backlog` — promoção exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-001`, `keytography-002` e `keytography-003` foram concluídos — ver [docs/plans/completed/](./plans/completed/). `keytography-004` foi promovido a `active` em 2026-09-29 e sua implementação está em `review` (PR aberto). Os demais permanecem em `backlog` — promoção exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).

@@ -1,6 +1,6 @@
 ---
 id: keytography-004
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: patch
@@ -33,6 +33,7 @@ Concluir o fluxo de "Esqueci minha senha", trocando efetivamente a senha de logi
 - Validação do token (existência, validade, não expirado, não usado).
 - Uso da cópia de recuperação da DEK (chave privada do sistema) para decifrá-la, e geração de uma nova cópia "do dono" cifrada com a chave derivada da nova senha (Argon2id).
 - Invalidação do token de reset após uso.
+- Registro do hash da senha de login anterior em um histórico dedicado a cada troca, com timestamp — `docs/capabilities/vault-entries/README.md` já afirmava que esse histórico "só passa a existir quando keytography-004 implementar a troca efetiva dessa senha", mas isso não estava no `Scope` original deste plano. Emenda registrada em 2026-09-29 após o gap ser identificado durante a implementação; ver `Approval`.
 
 ## Out Of Scope
 
@@ -41,22 +42,28 @@ Concluir o fluxo de "Esqueci minha senha", trocando efetivamente a senha de logi
 
 ## Approval
 
+Aprovado pelo usuário em 2026-09-29, ao pedir explicitamente para prosseguir com o próximo passo do `ROADMAP.md` (este plano). Por tocar autenticação e a criptografia da DEK, a ativação foi confirmada separadamente via pergunta explícita (per `AGENTS.md`), com o usuário aprovando a implementação exatamente como escrita neste `Scope` — mecanismo de re-wrap já definido em `ADR-0001`, sem decisão de design nova além do já especificado ali.
+
+**Emenda de escopo (2026-09-29):** durante a implementação, identifiquei que `docs/capabilities/vault-entries/README.md` já descrevia um histórico da senha de login como parte da entrega deste plano, mas o `Scope` original não incluía essa persistência. Perguntei ao usuário como proceder (emendar e implementar, ou deixar fora e corrigir a documentação); o usuário aprovou explicitamente emendar o `Scope` agora e implementar o histórico (`UserPasswordHistory`) como parte desta mesma entrega.
+
 ## Acceptance Criteria
 
 - `POST /auth/reset-password` com um token válido e uma nova senha retorna 200, e o login subsequente com a nova senha funciona.
 - Após a troca, todas as entradas de cofre criadas antes da troca continuam legíveis e idênticas (mesmo conteúdo decifrado) — validado comparando o conteúdo decifrado antes e depois da troca.
 - Um token de reset expirado ou já usado retorna 400/410 (não permite a troca).
 - Tentar logar com a senha antiga após a troca falha (401).
+- Após uma troca de senha bem-sucedida, existe um registro de histórico com o hash da senha anterior e o timestamp da troca.
 - O job `build` do CI permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
 
-- `dotnet test` cobrindo: reset com token válido, token expirado, token já usado, e a preservação do conteúdo decifrado do cofre antes/depois da troca.
+- `dotnet test` cobrindo: reset com token válido, token expirado, token já usado, a preservação do conteúdo decifrado do cofre antes/depois da troca, e a criação do registro de histórico da senha de login.
 - Confirmar no GitHub Actions que o job `build` passou no PR desta entrega.
 
 ## Documentation Updates
 
 - `docs/capabilities/authentication-and-users/README.md`: `Current Status` para `implemented` (o módulo de autenticação fica completo com este plano).
+- `docs/capabilities/vault-entries/README.md`: atualizar a nota do `Current Status` e a Key Rule sobre histórico de senha de login, que passa a existir de fato com este plano.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
