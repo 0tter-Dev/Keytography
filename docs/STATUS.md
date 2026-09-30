@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002` e `keytography-003` concluídos. `keytography-004` (conclusão da recuperação de senha) está em `review` (PR aberto).
+Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002`, `keytography-003` e `keytography-004` concluídos.
 
 ## Milestones
 
@@ -13,7 +13,7 @@ Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002` e `k
 - **2026-09-27** — [keytography-001](./plans/completed/keytography-001-bootstrap-backend.md) concluído ([PR #2](https://github.com/0tter-Dev/Keytography/pull/2)): bootstrap do backend (.NET 10, EF Core + SQLite, `GET /health`, CI real). Ver [docs/guides/running-locally.md](./guides/running-locally.md).
 - **2026-09-27** — [keytography-002](./plans/completed/keytography-002-authentication-and-users.md) concluído ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
 - **2026-09-29** — [keytography-003](./plans/completed/keytography-003-vault-entries-crud-and-encryption.md) concluído ([PR #6](https://github.com/0tter-Dev/Keytography/pull/6)): CRUD de entradas de cofre com criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas, soft delete/lixeira, leitura de supervisão do `Admin`, e cache de DEK em sessão ([ADR-0002](./decisions/ADR-0002-dek-session-cache.md)).
-- **2026-09-29** — [keytography-004](./plans/review/keytography-004-password-recovery-completion.md) em `review` (PR aberto): conclusão do fluxo de redefinição de senha (`POST /auth/reset-password`), re-cifragem da cópia "do dono" da DEK sem perda de acesso ao cofre, e histórico da senha de login.
+- **2026-09-30** — [keytography-004](./plans/completed/keytography-004-password-recovery-completion.md) concluído ([PR #8](https://github.com/0tter-Dev/Keytography/pull/8)): conclusão do fluxo de redefinição de senha (`POST /auth/reset-password`), re-cifragem da cópia "do dono" da DEK sem perda de acesso ao cofre, e histórico da senha de login.
 
 ## Capability Dashboard
 
