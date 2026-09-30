@@ -12,4 +12,6 @@ public record LoginResponse(string Token, DateTimeOffset ExpiresAt);
 
 public record ForgotPasswordRequest(string Email);
 
+public record ResetPasswordRequest(string Token, string NewPassword);
+
 public record MeResponse(Guid Id, string Login, string Email, string Role);

@@ -12,6 +12,7 @@ public class KeytographyDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<UserToken> UserTokens => Set<UserToken>();
+    public DbSet<UserPasswordHistory> UserPasswordHistories => Set<UserPasswordHistory>();
     public DbSet<VaultKey> VaultKeys => Set<VaultKey>();
     public DbSet<VaultEntry> VaultEntries => Set<VaultEntry>();
     public DbSet<VaultEntryHistory> VaultEntryHistories => Set<VaultEntryHistory>();
@@ -30,6 +31,15 @@ public class KeytographyDbContext : DbContext
             entity.HasOne<User>()
                 .WithMany()
                 .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserPasswordHistory>(entity =>
+        {
+            entity.HasIndex(h => h.UserId);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(h => h.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
