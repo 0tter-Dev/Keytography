@@ -1,10 +1,10 @@
 ---
 id: keytography-006
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: medium
 sequence: 6
 depends_on: [keytography-005]
@@ -61,3 +61,5 @@ Aprovado pelo usuário em 2026-10-01, ao pedir explicitamente para prosseguir co
 - `docs/capabilities/password-evaluation/README.md`: constatação deliberada de que **não** precisa de atualização — seu código (critérios, motor de agregação, endpoints) não mudou nesta entrega; o gerador apenas consome `PasswordEvaluator.Evaluate` já existente, e a relação "is used by password-generation" já estava documentada desde `keytography-005`.
 
 ## Outcome
+
+Entregue via [PR #12](https://github.com/0tter-Dev/Keytography/pull/12), mergeada em `main` no commit `89d6e46` em 2026-10-01. Commit de implementação: `efde180` (`POST /passwords/generate` com CSPRNG, exclusão de caracteres ambíguos, e retry limitado contra o motor de `keytography-005`, retornando 422 quando a força mínima é inatingível). CI (`build`) passou. Auditado via `project-audit` como gate pré-merge (PR ainda aberta no momento da auditoria), sem achados bloqueantes — Acceptance Criteria, fidelidade documental das duas capabilities autorizadas, metadados do plano, escopo, links e ADRs implícitas todos `PASS`; única observação não-bloqueante foi a ausência de um item de Acceptance Criteria explícito para a exigência de autenticação (coberta por teste e documentação, só não listada como AC própria). Validação local: `dotnet test` com 32/32 testes passando (Debug e Release). `actual_version_impact: minor` — coerente com `expected_version_impact`, sem divergência a justificar (novo endpoint aditivo, sem breaking changes). Com este plano, todas as 4 capabilities do roadmap original (autenticação, cofre, avaliação, geração de senha) estão `implemented`.
