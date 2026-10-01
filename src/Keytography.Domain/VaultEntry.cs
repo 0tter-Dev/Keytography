@@ -12,4 +12,10 @@ public class VaultEntry
     public DateTimeOffset? DeletedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    // Nota de forca da senha (ver capabilities/password-evaluation). Nunca deriva de
+    // dado sensivel exposto diretamente - so o resultado numerico/detalhamento por
+    // criterio e persistido aqui, nunca a senha em si.
+    public double? PasswordScore { get; set; }
+    public string? PasswordScoreDetailJson { get; set; }
 }

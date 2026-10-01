@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002`, `keytography-003` e `keytography-004` concluídos.
+Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002`, `keytography-003` e `keytography-004` concluídos. `keytography-005` (motor de avaliação de força de senha) está em `review` (PR aberto).
 
 ## Milestones
 
@@ -14,6 +14,7 @@ Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002`, `ke
 - **2026-09-27** — [keytography-002](./plans/completed/keytography-002-authentication-and-users.md) concluído ([PR #4](https://github.com/0tter-Dev/Keytography/pull/4)): registro com verificação de e-mail, login JWT, bootstrap automático do `Admin`, solicitação de redefinição de senha. Conclusão da troca de senha fica para `keytography-004`.
 - **2026-09-29** — [keytography-003](./plans/completed/keytography-003-vault-entries-crud-and-encryption.md) concluído ([PR #6](https://github.com/0tter-Dev/Keytography/pull/6)): CRUD de entradas de cofre com criptografia de envelope (DEK + chave dupla, ADR-0001), histórico de senhas, soft delete/lixeira, leitura de supervisão do `Admin`, e cache de DEK em sessão ([ADR-0002](./decisions/ADR-0002-dek-session-cache.md)).
 - **2026-09-30** — [keytography-004](./plans/completed/keytography-004-password-recovery-completion.md) concluído ([PR #8](https://github.com/0tter-Dev/Keytography/pull/8)): conclusão do fluxo de redefinição de senha (`POST /auth/reset-password`), re-cifragem da cópia "do dono" da DEK sem perda de acesso ao cofre, e histórico da senha de login.
+- **2026-09-30** — [keytography-005](./plans/review/keytography-005-password-evaluation-engine.md) em `review` (PR aberto): motor de avaliação de força de senha (comprimento, entropia, reuso, complexidade), recálculo automático em criação/edição, e recálculo retroativo sob demanda via decifragem em lote pela chave de recuperação ([ADR-0003](./decisions/ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md)).
 
 ## Capability Dashboard
 
@@ -21,5 +22,5 @@ Core/backend em desenvolvimento ativo. `keytography-001`, `keytography-002`, `ke
 | --- | --- | --- |
 | Autenticação e Usuários | implemented | [authentication-and-users](./capabilities/authentication-and-users/README.md) |
 | Entradas de Cofre (Contas/Senhas) | implemented | [vault-entries](./capabilities/vault-entries/README.md) |
-| Avaliação de Senha | planned | [password-evaluation](./capabilities/password-evaluation/README.md) |
+| Avaliação de Senha | implemented | [password-evaluation](./capabilities/password-evaluation/README.md) |
 | Geração de Senha | planned | [password-generation](./capabilities/password-generation/README.md) |

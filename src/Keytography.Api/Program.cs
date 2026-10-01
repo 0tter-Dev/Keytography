@@ -1,6 +1,9 @@
 using Keytography.Api.Auth;
+using Keytography.Api.PasswordEvaluation;
 using Keytography.Api.Vault;
 using Keytography.Domain;
+using Keytography.Domain.PasswordEvaluation;
+using Keytography.Domain.PasswordEvaluation.Criteria;
 using Keytography.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -29,6 +32,14 @@ builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IDekCache, MemoryDekCache>();
 builder.Services.AddSingleton<IRecoveryKeyProvider, RecoveryKeyProvider>();
+
+// Lista aberta de criterios de avaliacao de senha (capabilities/password-evaluation) -
+// novos criterios sao adicionados registrando mais implementacoes aqui, sem alterar
+// os ja existentes nem o motor de agregacao (Keytography.Domain.PasswordEvaluation).
+builder.Services.AddSingleton<IPasswordEvaluationCriterion, LengthCriterion>();
+builder.Services.AddSingleton<IPasswordEvaluationCriterion, EntropyCriterion>();
+builder.Services.AddSingleton<IPasswordEvaluationCriterion, ReuseCriterion>();
+builder.Services.AddSingleton<IPasswordEvaluationCriterion, ComplexityCriterion>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -91,6 +102,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 app.MapAuthEndpoints();
 app.MapVaultEndpoints();
+app.MapPasswordEvaluationEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {

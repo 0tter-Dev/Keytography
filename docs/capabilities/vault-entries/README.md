@@ -14,7 +14,7 @@ CRUD das contas e senhas armazenadas no cofre pessoal de cada usuário.
 - Suporte a campos adicionais de definição livre, sem schema fixo (ex.: URL, email, descrição), a critério do usuário no momento do cadastro.
 - Senhas são armazenadas de forma criptografada, nunca em texto puro, usando o esquema de chave dupla (DEK simétrica por usuário + duas cópias cifradas dela) definido em [ADR-0001](../../decisions/ADR-0001-vault-encryption-and-recovery.md).
 - Histórico é mantido tanto para a senha de login do próprio usuário (hash da senha anterior + timestamp, a cada redefinição via `POST /auth/reset-password`) quanto para as senhas de cada conta cadastrada, permitindo consultar quando ela mudou.
-- O histórico de senhas alimenta os critérios de [password-evaluation](../password-evaluation/README.md) (ex.: repetição de senha/padrão já usado antes, na mesma conta ou em outras).
+- O histórico de senhas alimenta os critérios de [password-evaluation](../password-evaluation/README.md) (ex.: repetição de senha/padrão já usado antes, na mesma conta ou em outras). Desde `keytography-005`, cada entrada guarda a nota de força resultante e o detalhamento por critério, recalculados automaticamente a cada criação/edição.
 - Exclusão usa soft delete por padrão: o registro vai para uma lixeira restaurável. Exclusão definitiva é uma ação manual disparada a partir da lixeira. Período de retenção antes de qualquer limpeza automática ainda não foi definido.
 
 ## Main Relationships
@@ -27,3 +27,4 @@ CRUD das contas e senhas armazenadas no cofre pessoal de cada usuário.
 
 - [ADR-0001: Criptografia do cofre com chave dupla e recuperação de acesso](../../decisions/ADR-0001-vault-encryption-and-recovery.md) — define o esquema de criptografia usado por este módulo.
 - [ADR-0002: Cache em memória da DEK por sessão](../../decisions/ADR-0002-dek-session-cache.md) — define como este módulo obtém a DEK já decifrada para operações do dono (via cache) e da supervisão do Admin (via chave de recuperação, sem cache).
+- [ADR-0003: Recálculo retroativo de avaliação de senha via decifragem em lote pela chave de recuperação](../../decisions/ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md) — define como [password-evaluation](../password-evaluation/README.md) acessa em lote as senhas deste módulo para recalcular notas de usuários não logados.

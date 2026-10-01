@@ -1,6 +1,6 @@
 ---
 id: keytography-005
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -11,7 +11,9 @@ depends_on: [keytography-003]
 authorized_capabilities:
   - docs/capabilities/password-evaluation/README.md
   - docs/capabilities/vault-entries/README.md
-decision_records: []
+decision_records:
+  - docs/decisions/ADR-0001-vault-encryption-and-recovery.md
+  - docs/decisions/ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md
 validation: []
 documentation_updates: []
 ---
@@ -41,6 +43,10 @@ Implementar o motor de avaliação de força de senha: mini-diagnóstico modular
 
 ## Approval
 
+Aprovado pelo usuário em 2026-09-30, ao pedir explicitamente para prosseguir com o próximo passo do `ROADMAP.md` (este plano).
+
+**Decisão de arquitetura formalizada antes da implementação:** o `Acceptance Criteria` deste plano exige recálculo retroativo da nota de senha para entradas de todos os usuários, inclusive os que não estão logados no momento — o que exige decifrar a DEK de todos os usuários via a cópia de recuperação (chave RSA do sistema) em lote, um uso mais amplo dessa chave do que o previsto em `ADR-0001` (que cobria só consultas pontuais do Admin ou troca de senha do próprio dono). Por tocar criptografia/controle de acesso, perguntei ao usuário como proceder antes de implementar; o usuário aprovou explicitamente o recálculo em lote via chave de recuperação, formalizado em [ADR-0003](../../decisions/ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md).
+
 ## Acceptance Criteria
 
 - Avaliar uma senha fraca (curta, comum, sem variação de caracteres) retorna uma nota baixa e o detalhamento indica quais critérios reprovaram.
@@ -48,6 +54,7 @@ Implementar o motor de avaliação de força de senha: mini-diagnóstico modular
 - Cadastrar uma senha idêntica a uma já usada anteriormente na mesma conta (presente no histórico) reduz a nota do critério de reuso especificamente.
 - Editar uma entrada de cofre dispara o recálculo da nota automaticamente, sem chamada manual adicional.
 - Adicionar um novo critério (via um teste que registra um critério de exemplo) e disparar o recálculo retroativo atualiza a nota de entradas pré-existentes de mais de um usuário, sem exigir edição manual de cada uma.
+- O recálculo retroativo é restrito ao `Admin` (`POST /vault/password-evaluation/recalculate`); um `Member` tentando disparar recebe 403.
 - O job `build` do CI permanece verde com os testes deste plano incluídos, sem exigir nenhuma mudança no workflow.
 
 ## Validation
@@ -58,6 +65,7 @@ Implementar o motor de avaliação de força de senha: mini-diagnóstico modular
 ## Documentation Updates
 
 - `docs/capabilities/password-evaluation/README.md`: `Current Status` para `implemented`; documentar os critérios efetivamente implementados se algum detalhe mudar em relação ao planejado.
+- `docs/capabilities/vault-entries/README.md`: documentar que cada entrada passa a guardar a nota de força e o detalhamento por critério, recalculados em criação/edição — código desta capability autorizada mudou (integração em `CreateAsync`/`UpdateAsync`), não só a capability principal do plano.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
