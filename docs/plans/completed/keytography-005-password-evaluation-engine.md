@@ -1,10 +1,10 @@
 ---
 id: keytography-005
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: medium
 sequence: 5
 depends_on: [keytography-003]
@@ -69,3 +69,5 @@ Aprovado pelo usuário em 2026-09-30, ao pedir explicitamente para prosseguir co
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
+
+Entregue via [PR #10](https://github.com/0tter-Dev/Keytography/pull/10), mergeada em `main` no commit `4b1e688` em 2026-10-01. Commit de implementação: `5bd1699` (motor de avaliação com 4 critérios — comprimento, entropia, reuso, complexidade —, integração automática em `CreateAsync`/`UpdateAsync` de `vault-entries`, e o endpoint `POST /vault/password-evaluation/recalculate` restrito ao `Admin` para recálculo retroativo em lote via chave de recuperação, formalizado em [ADR-0003](../../decisions/ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md) — decisão de arquitetura pausada e aprovada explicitamente antes da implementação). CI (`build`) passou. Auditado via `project-audit` após o merge (confirmação, dado que a PR já havia sido mergeada no momento da auditoria), sem achados bloqueantes — Acceptance Criteria, fidelidade documental das duas capabilities autorizadas, metadados do plano, escopo, links e ADRs implícitas todos `PASS`. Validação local: `dotnet test` com 27/27 testes passando (Debug e Release), cobrindo cada critério isoladamente, cálculo da nota média, recálculo automático em criação/edição, recálculo retroativo com múltiplos usuários (via registro de um critério de teste), e a restrição de acesso ao `Admin`. `actual_version_impact: minor` — coerente com `expected_version_impact`, sem divergência a justificar (novo endpoint e novos campos de resposta aditivos, sem breaking changes).
