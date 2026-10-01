@@ -4,6 +4,6 @@
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | Gerador de senha | [keytography-006](./plans/backlog/keytography-006-password-generator.md) — depende de keytography-005 |
+| medium | Gerador de senha | [keytography-006](./plans/review/keytography-006-password-generator.md) — **review** (PR aberto) |
 
-`keytography-001`, `keytography-002`, `keytography-003`, `keytography-004` e `keytography-005` foram concluídos — ver [docs/plans/completed/](./plans/completed/). Os demais permanecem em `backlog` — promoção exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-001`, `keytography-002`, `keytography-003`, `keytography-004` e `keytography-005` foram concluídos — ver [docs/plans/completed/](./plans/completed/). `keytography-006` foi promovido a `active` em 2026-10-01 e sua implementação está em `review` (PR aberto). Nenhum outro plano permanece em `backlog` no momento.
