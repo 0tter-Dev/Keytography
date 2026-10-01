@@ -1,5 +1,6 @@
 using Keytography.Api.Auth;
 using Keytography.Api.PasswordEvaluation;
+using Keytography.Api.PasswordGeneration;
 using Keytography.Api.Vault;
 using Keytography.Domain;
 using Keytography.Domain.PasswordEvaluation;
@@ -103,6 +104,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapAuthEndpoints();
 app.MapVaultEndpoints();
 app.MapPasswordEvaluationEndpoints();
+app.MapPasswordGenerationEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
