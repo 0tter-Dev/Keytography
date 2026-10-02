@@ -16,12 +16,14 @@ CRUD das contas e senhas armazenadas no cofre pessoal de cada usuário.
 - Histórico é mantido tanto para a senha de login do próprio usuário (hash da senha anterior + timestamp, a cada redefinição via `POST /auth/reset-password`) quanto para as senhas de cada conta cadastrada, permitindo consultar quando ela mudou.
 - O histórico de senhas alimenta os critérios de [password-evaluation](../password-evaluation/README.md) (ex.: repetição de senha/padrão já usado antes, na mesma conta ou em outras). Desde `keytography-005`, cada entrada guarda a nota de força resultante e o detalhamento por critério, recalculados automaticamente a cada criação/edição.
 - Exclusão usa soft delete por padrão: o registro vai para uma lixeira restaurável. Exclusão definitiva é uma ação manual disparada a partir da lixeira. Período de retenção antes de qualquer limpeza automática ainda não foi definido.
+- **Evolução futura (não implementada):** organização por tags, favoritos, e um esquema de grupos/subgrupos, discutidos durante o planejamento da interface web (ver [web-interface](../web-interface/README.md#future-considerations)). Exigem schema novo neste módulo — registrados aqui só para não se perderem.
 
 ## Main Relationships
 
 - depends on [authentication-and-users](../authentication-and-users/README.md): toda entrada de cofre pertence a um usuário autenticado, e o acesso de leitura/escrita segue as regras de role definidas lá.
 - is used by [password-evaluation](../password-evaluation/README.md): fornece a senha atual e o histórico a avaliar.
 - is used by [password-generation](../password-generation/README.md): senhas geradas são salvas como entradas deste módulo.
+- is used by [web-interface](../web-interface/README.md): telas de listagem, criação, edição, lixeira e histórico de entradas.
 
 ## Cross-Cutting Decisions
 

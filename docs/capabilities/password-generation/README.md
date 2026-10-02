@@ -18,3 +18,4 @@ Gerar senhas fortes configuráveis para uso em novas contas ou trocas de senha.
 
 - depends on [password-evaluation](../password-evaluation/README.md): valida a força mínima antes de uma senha gerada ser aceita.
 - is used by [vault-entries](../vault-entries/README.md): senhas geradas aqui podem ser salvas como uma entrada de cofre.
+- is used by [web-interface](../web-interface/README.md): ferramenta de geração de senha integrada aos formulários de entrada de cofre.

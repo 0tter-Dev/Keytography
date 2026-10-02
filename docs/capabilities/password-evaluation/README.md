@@ -19,6 +19,7 @@ Avaliar a força de uma senha através de um conjunto modular de critérios, pro
 
 - depends on [vault-entries](../vault-entries/README.md): lê a senha atual e o histórico de uma entrada de cofre para avaliar.
 - is used by [password-generation](../password-generation/README.md): a nota média produzida aqui é o critério de corte para a força mínima exigida na geração.
+- is used by [web-interface](../web-interface/README.md): exibe a nota e o detalhamento por critério já retornados pela API de cofre.
 
 ## Cross-Cutting Decisions
 

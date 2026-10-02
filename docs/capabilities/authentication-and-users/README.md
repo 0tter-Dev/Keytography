@@ -27,3 +27,4 @@ Gerenciar identidade, autenticação e controle de acesso por role dos usuários
 ## Main Relationships
 
 - is used by [vault-entries](../vault-entries/README.md): todo acesso a uma conta/senha passa por autenticação e checagem de role.
+- is used by [web-interface](../web-interface/README.md): telas de login, registro e redefinição de senha.
