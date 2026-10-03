@@ -1,4 +1,5 @@
 using Keytography.Api.Auth;
+using Keytography.Api.Health;
 using Keytography.Api.PasswordEvaluation;
 using Keytography.Api.PasswordGeneration;
 using Keytography.Api.Vault;
@@ -7,11 +8,13 @@ using Keytography.Domain.PasswordEvaluation;
 using Keytography.Domain.PasswordEvaluation.Criteria;
 using Keytography.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Text.Json;
+
+const string WebCorsPolicy = "web";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +30,21 @@ builder.Services.AddDbContext<KeytographyDbContext>((serviceProvider, options) =
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<KeytographyDbContext>("database");
+
+builder.Services.AddOpenApi();
+
+// Origens permitidas lidas via DI (apos builder.Build()) para respeitar overrides de
+// configuracao de teste. Padrao: servidor de desenvolvimento do Vite (web/).
+builder.Services.AddCors();
+builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, configuration) =>
+{
+    var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? ["http://localhost:5173", "http://127.0.0.1:5173"];
+    options.AddPolicy(WebCorsPolicy, policy => policy
+        .WithOrigins(origins)
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
 
 builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 
@@ -80,26 +98,33 @@ if (string.IsNullOrEmpty(app.Configuration["Jwt:Key"]))
 // em vez de falhar de forma tardia e confusa na primeira operacao de cofre.
 app.Services.GetRequiredService<IRecoveryKeyProvider>();
 
+app.UseCors(WebCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHealthChecks("/health", new HealthCheckOptions
+if (app.Environment.IsDevelopment())
 {
-    ResponseWriter = async (context, report) =>
+    app.MapOpenApi();
+}
+
+// MapGet (em vez de MapHealthChecks) para o endpoint aparecer no OpenAPI com seu DTO tipado.
+app.MapGet("/health", async (HealthCheckService healthCheckService, CancellationToken cancellationToken) =>
     {
-        context.Response.ContentType = "application/json";
-        var payload = JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString().ToLowerInvariant(),
-            checks = report.Entries.Select(entry => new
-            {
-                name = entry.Key,
-                status = entry.Value.Status.ToString().ToLowerInvariant()
-            })
-        });
-        await context.Response.WriteAsync(payload);
-    }
-});
+        var report = await healthCheckService.CheckHealthAsync(cancellationToken);
+        var response = new HealthResponse(
+            report.Status.ToString().ToLowerInvariant(),
+            report.Entries
+                .Select(entry => new HealthCheckEntryResponse(entry.Key, entry.Value.Status.ToString().ToLowerInvariant()))
+                .ToList());
+
+        return Results.Json(
+            response,
+            statusCode: report.Status == HealthStatus.Unhealthy
+                ? StatusCodes.Status503ServiceUnavailable
+                : StatusCodes.Status200OK);
+    })
+    .Produces<HealthResponse>()
+    .Produces<HealthResponse>(StatusCodes.Status503ServiceUnavailable);
 
 app.MapAuthEndpoints();
 app.MapVaultEndpoints();

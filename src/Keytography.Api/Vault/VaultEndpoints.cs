@@ -14,15 +14,15 @@ public static class VaultEndpoints
     {
         var entries = app.MapGroup("/vault/entries").RequireAuthorization();
 
-        entries.MapPost("/", CreateAsync);
-        entries.MapGet("/", ListAsync);
-        entries.MapGet("/trash", ListTrashAsync);
-        entries.MapGet("/{id:guid}", GetAsync);
-        entries.MapPut("/{id:guid}", UpdateAsync);
-        entries.MapGet("/{id:guid}/history", GetHistoryAsync);
-        entries.MapDelete("/{id:guid}", SoftDeleteAsync);
-        entries.MapPost("/{id:guid}/restore", RestoreAsync);
-        entries.MapDelete("/{id:guid}/permanent", PermanentDeleteAsync);
+        entries.MapPost("/", CreateAsync).Produces<VaultEntryDetailResponse>(StatusCodes.Status201Created);
+        entries.MapGet("/", ListAsync).Produces<List<VaultEntryListItemResponse>>();
+        entries.MapGet("/trash", ListTrashAsync).Produces<List<VaultEntryListItemResponse>>();
+        entries.MapGet("/{id:guid}", GetAsync).Produces<VaultEntryDetailResponse>();
+        entries.MapPut("/{id:guid}", UpdateAsync).Produces<VaultEntryDetailResponse>();
+        entries.MapGet("/{id:guid}/history", GetHistoryAsync).Produces<List<VaultEntryHistoryItemResponse>>();
+        entries.MapDelete("/{id:guid}", SoftDeleteAsync).Produces(StatusCodes.Status204NoContent);
+        entries.MapPost("/{id:guid}/restore", RestoreAsync).Produces(StatusCodes.Status204NoContent);
+        entries.MapDelete("/{id:guid}/permanent", PermanentDeleteAsync).Produces(StatusCodes.Status204NoContent);
 
         // Supervisao do Admin: somente leitura, nunca escrita (ver ADR-0001 e
         // capabilities/authentication-and-users). As rotas de escrita abaixo
@@ -31,8 +31,8 @@ public static class VaultEndpoints
         var supervision = app.MapGroup("/vault/users/{userId:guid}/entries")
             .RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
 
-        supervision.MapGet("/", ListForSupervisionAsync);
-        supervision.MapGet("/{id:guid}", GetForSupervisionAsync);
+        supervision.MapGet("/", ListForSupervisionAsync).Produces<List<VaultEntryListItemResponse>>();
+        supervision.MapGet("/{id:guid}", GetForSupervisionAsync).Produces<VaultEntryDetailResponse>();
         supervision.MapPost("/", () => Results.StatusCode(StatusCodes.Status403Forbidden));
         supervision.MapPut("/{id:guid}", () => Results.StatusCode(StatusCodes.Status403Forbidden));
         supervision.MapDelete("/{id:guid}", () => Results.StatusCode(StatusCodes.Status403Forbidden));
