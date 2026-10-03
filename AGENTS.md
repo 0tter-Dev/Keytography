@@ -16,7 +16,9 @@ Agentes não devem ler documentos de `capabilities/` por padrão. Um plano ativo
 
 Todo novo plano de entrega define `requires_pull_request: true`. Para um plano ativo já aprovado, esse campo é a autorização explícita para executar a sequência de entrega documentada — apenas ela: branch, implementação, validação, commit, push e abertura do pull request — sem precisar de uma segunda autorização para essas ações.
 
-Após mudanças de código relevantes, atualize a capability dona do comportamento e todos os documentos de status, guia, referência, decisão ou plano afetados.
+Após mudanças de código relevantes, atualize a capability dona do comportamento e todos os documentos de status, guia, referência, decisão ou plano afetados — **incluindo o `README.md` da raiz (Quick Start, Current Scope, Stack) sempre que a entrega mudar o que o projeto roda, oferece ou usa**. Uma entrega só está pronta quando isso foi feito, ou registrado em `Documentation Updates` como constatação deliberada de que não precisa mudar (checklist em `docs/DOCUMENTATION-GUIDE.md`, seção "Definição de pronto para a documentação de uma entrega").
+
+Mudanças em endpoint, DTO ou metadado de resposta da API exigem regenerar e commitar `docs/reference/openapi.json` e `web/src/api/schema.d.ts` na mesma entrega (ADR-0004); o CI e a suíte de testes falham se isso for esquecido.
 
 ## Limites de escopo
 

@@ -1,6 +1,6 @@
 ---
 id: keytography-007
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -10,7 +10,8 @@ sequence: 7
 depends_on: [keytography-006]
 authorized_capabilities:
   - docs/capabilities/web-interface/README.md
-decision_records: []
+decision_records:
+  - docs/decisions/ADR-0004-versioned-openapi-contract.md
 validation: []
 documentation_updates: []
 ---
@@ -48,6 +49,23 @@ O core/backend está completo (`keytography-001` a `006`). Esta é a primeira en
 
 ## Approval
 
+Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a implementação do próximo passo do `ROADMAP.md` (este plano). A stack (React + TypeScript + Vite) e a lista de bibliotecas deste `Scope` foram discutidas e aprovadas durante o planejamento (`project-plans`, 2026-10-01/02). Este plano não toca criptografia, autenticação nem controle de acesso por role (a mudança de CORS e a exposição do OpenAPI não alteram nenhuma regra de acesso existente).
+
+**Esclarecimentos de implementação (2026-10-03)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite, registrados para a revisão:
+
+- **Bibliotecas adiadas** (diretriz do usuário de evitar "usos extras"): `motion`, `@formkit/auto-animate`, `cmdk`, React Hook Form + Zod **não** foram instaladas aqui, pois nenhum código desta entrega as usa; entram no plano que as consome (`008` formulários; `014` animações/command palette). Tabela em `docs/guides/web-frontend-conventions.md`. Foi acrescentado `openapi-fetch`, par oficial do `openapi-typescript` para o cliente tipado.
+- **Metadados de resposta nos endpoints existentes**: sem eles o OpenAPI não descreve os DTOs de retorno (os handlers devolvem `IResult`) e o cliente tipado ficaria vazio. Foram adicionados `.Produces<T>()` aos endpoints de `authentication-and-users`, `vault-entries`, `password-evaluation` e `password-generation`, e três respostas anônimas (`{ message }`, `{ updatedEntries }`) viraram records (`MessageResponse`, `RecalculationResponse`) com o **mesmo formato JSON**. Nenhum comportamento mudou, por isso as docs dessas capabilities (fora de `authorized_capabilities`) não foram tocadas.
+- **`GET /health` como `MapGet`** (em vez de `MapHealthChecks`): endpoints de health check não entram no OpenAPI. Mesmo caminho, mesmo JSON (`status` + `checks[{name,status}]`), mesmos códigos (200; 503 se `Unhealthy`); coberto pelo teste existente `HealthCheckTests`.
+- **Contrato versionado** em `docs/reference/openapi.json` + teste de backend contra drift, em vez de gerar o OpenAPI em tempo de build (a inicialização da API exige segredos locais, indisponíveis no build).
+- **`overrides` escopado** no `package.json` do `web/` para `openapi-typescript` (peer `typescript@^5`) usar o TypeScript 6 do projeto.
+
+**Ajustes após a `project-audit` (2026-10-03), aprovados pelo usuário:**
+
+- Campos numéricos do OpenAPI voltaram a `number`/`integer` (o ASP.NET Core os descrevia como `number | string` por aceitar números como texto na leitura): `NumericSchemaTransformer` + teste de regressão; contrato e tipos regenerados.
+- Novo token `--accent-ink` (mesmo destaque, luminosidade limitada por tema) para foco e ícones, porque o destaque cru ficava abaixo de 3:1 contra fundos claros em 12 das 36 combinações (pior: amarelo sobre creme, 1.2:1). Teste automático `contrast.test.ts` lê os tokens reais e protege tudo isso.
+- Política do contrato versionado formalizada em [ADR-0004](../../decisions/ADR-0004-versioned-openapi-contract.md), com a obrigação de manutenção explícita.
+- O `README.md` da raiz não estava coberto pelo plano; passou a constar em `Acceptance Criteria` e `Documentation Updates`, e a regra foi tornada explícita nos documentos de governança para não se repetir.
+
 ## Acceptance Criteria
 
 - `npm run build` produz um bundle de produção sem erros; `npm run dev` sobe o servidor de desenvolvimento.
@@ -57,6 +75,9 @@ O core/backend está completo (`keytography-001` a `006`). Esta é a primeira en
 - Uma string de texto editada no arquivo de tradução `pt-BR` se reflete na tela sem alterar nenhum componente.
 - A tela de prova de vida exibe o status de `/health` corretamente nos dois temas (claro/escuro) e em larguras de viewport mobile e desktop.
 - O guia `docs/guides/web-frontend-conventions.md` existe e é referenciado por `docs/DEVELOPMENT-GUIDE.md`.
+- O destaque usado como traço sobre o fundo (anel de foco, ícones) tem contraste ≥ 3:1 contra fundo e superfície nas 36 combinações tema × destaque (via `accent-ink`), e o texto sobre o destaque ≥ 4.5:1 — garantido por um teste automático que lê os tokens reais de `index.css`.
+- O contrato OpenAPI descreve campos numéricos como `number`/`integer` (nunca `number | string`), e o `schema.d.ts` gerado reflete isso.
+- O `README.md` da raiz reflete o estado real após a entrega (Quick Start com o frontend, Current Scope, Stack) e as regras de manutenção da documentação (README raiz e contrato da API) estão explícitas em `AGENTS.md`, `DEVELOPMENT-GUIDE.md`, `DOCUMENTATION-GUIDE.md` e `docs/plans/README.md`.
 - O CI passa com o novo job/etapa de frontend incluído.
 
 ## Validation
@@ -70,6 +91,11 @@ O core/backend está completo (`keytography-001` a `006`). Esta é a primeira en
 - `docs/capabilities/web-interface/README.md`: `Current Status` para `in_progress` (fundação criada, ainda sem telas funcionais); documentar o sistema de theming e i18n efetivamente implementados.
 - `docs/DEVELOPMENT-GUIDE.md`: referenciar `docs/guides/web-frontend-conventions.md` nas Documentation Rules.
 - `docs/guides/running-locally.md`: adicionar os passos para rodar o frontend localmente (`npm install`, `npm run dev`), e a nova variável de origem/CORS se aplicável.
+- `docs/guides/web-frontend-conventions.md` (novo) e `docs/reference/README.md` + `docs/reference/openapi.json` (novos): criados por este plano; `docs/START-HERE.md` deixa de dizer que `reference/` está vazio.
+- Capabilities de backend (`authentication-and-users`, `vault-entries`, `password-evaluation`, `password-generation`): constatação deliberada de que **não** precisam de atualização — só ganharam metadados de resposta no OpenAPI, sem mudança de comportamento (ver `Approval`).
+- `README.md` (raiz): Quick Start (backend + frontend), Current Scope e Stack refletindo o estado real após esta entrega.
+- `docs/decisions/ADR-0004-versioned-openapi-contract.md` (novo) e `docs/decisions/README.md`: registram a política do contrato OpenAPI versionado e a obrigação de mantê-lo.
+- `AGENTS.md`, `docs/DEVELOPMENT-GUIDE.md`, `docs/DOCUMENTATION-GUIDE.md`, `docs/plans/README.md`: regras explícitas de que o `README.md` da raiz e o contrato da API fazem parte da definição de "pronto" de uma entrega.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

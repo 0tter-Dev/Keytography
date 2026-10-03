@@ -10,7 +10,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| high | Scaffolding, design system e theming | [keytography-007](./plans/backlog/keytography-007-web-frontend-scaffolding-and-foundation.md) — depende de keytography-006 |
+| high | Scaffolding, design system e theming | [keytography-007](./plans/review/keytography-007-web-frontend-scaffolding-and-foundation.md) — **review** (PR aberto) |
 | medium | UI de autenticação | [keytography-008](./plans/backlog/keytography-008-web-authentication-ui.md) — depende de keytography-007 |
 | medium | UI de cofre (CRUD núcleo) | [keytography-009](./plans/backlog/keytography-009-web-vault-entries-ui.md) — depende de keytography-008 |
 | medium | UI de avaliação de força | [keytography-010](./plans/backlog/keytography-010-web-password-evaluation-ui.md) — depende de keytography-009 |
@@ -19,7 +19,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 | medium | UI de supervisão do Admin (mínima) | [keytography-013](./plans/backlog/keytography-013-web-admin-supervision-ui.md) — depende de keytography-008, keytography-009 |
 | medium | Polimento visual, responsividade e interação | [keytography-014](./plans/backlog/keytography-014-web-visual-polish-and-interactions.md) — depende de keytography-010, 011, 012, 013 |
 
-Todos os 8 planos acima estão em `backlog` — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-007` foi promovido a `active` em 2026-10-03 e sua implementação está em `review` (PR aberto). Os demais planos acima permanecem em `backlog` — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
 
 ## Evolução futura (não planejada ainda)
 

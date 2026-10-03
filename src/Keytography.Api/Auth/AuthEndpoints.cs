@@ -21,12 +21,12 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/auth");
 
-        group.MapPost("/register", RegisterAsync);
-        group.MapPost("/verify-email", VerifyEmailAsync);
-        group.MapPost("/login", LoginAsync);
-        group.MapPost("/forgot-password", ForgotPasswordAsync);
-        group.MapPost("/reset-password", ResetPasswordAsync);
-        group.MapGet("/me", GetMeAsync).RequireAuthorization();
+        group.MapPost("/register", RegisterAsync).Produces<RegisterResponse>(StatusCodes.Status201Created);
+        group.MapPost("/verify-email", VerifyEmailAsync).Produces<MessageResponse>();
+        group.MapPost("/login", LoginAsync).Produces<LoginResponse>();
+        group.MapPost("/forgot-password", ForgotPasswordAsync).Produces<MessageResponse>();
+        group.MapPost("/reset-password", ResetPasswordAsync).Produces<MessageResponse>();
+        group.MapGet("/me", GetMeAsync).RequireAuthorization().Produces<MeResponse>();
     }
 
     private static async Task<IResult> RegisterAsync(
@@ -127,7 +127,7 @@ public static class AuthEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return Results.Ok(new { message = "E-mail verificado com sucesso." });
+        return Results.Ok(new MessageResponse("E-mail verificado com sucesso."));
     }
 
     private static async Task<IResult> LoginAsync(
@@ -193,7 +193,7 @@ public static class AuthEndpoints
         }
 
         // Resposta identica exista ou nao o e-mail, para nao revelar quais e-mails estao cadastrados.
-        return Results.Ok(new { message = "Se o e-mail existir, um token de redefinição foi enviado." });
+        return Results.Ok(new MessageResponse("Se o e-mail existir, um token de redefinição foi enviado."));
     }
 
     private static async Task<IResult> ResetPasswordAsync(
@@ -242,7 +242,7 @@ public static class AuthEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return Results.Ok(new { message = "Senha redefinida com sucesso." });
+        return Results.Ok(new MessageResponse("Senha redefinida com sucesso."));
     }
 
     private static async Task<IResult> GetMeAsync(ClaimsPrincipal claimsPrincipal, KeytographyDbContext db, CancellationToken cancellationToken)

@@ -24,7 +24,7 @@ public static class PasswordGenerationEndpoints
 
     public static void MapPasswordGenerationEndpoints(this WebApplication app)
     {
-        app.MapPost("/passwords/generate", GenerateAsync).RequireAuthorization();
+        app.MapPost("/passwords/generate", GenerateAsync).RequireAuthorization().Produces<GeneratePasswordResponse>();
     }
 
     private static IResult GenerateAsync(

@@ -60,6 +60,7 @@ Cada plano anterior já entrega estilo básico (nada fica sem estilo por padrão
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: `Current Status` para `implemented` — a interface web está funcionalmente completa para esta fase.
+- `README.md` (raiz): Quick Start e Current Scope finais, com a interface web como funcionalmente completa para esta fase.
 - `docs/STATUS.md`: refletir o novo status; marcar a interface web como concluída para esta fase.
 - `docs/PROJECT-ARCHITECTURE.md`: confirmar, na Architectural Direction, que a interface web está consolidada e que Mobile/Desktop (e i18n `en`/`es`) podem ser planejados a partir daqui.
 

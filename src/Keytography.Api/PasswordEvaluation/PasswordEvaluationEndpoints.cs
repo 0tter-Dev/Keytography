@@ -19,7 +19,8 @@ public static class PasswordEvaluationEndpoints
     public static void MapPasswordEvaluationEndpoints(this WebApplication app)
     {
         app.MapPost("/vault/password-evaluation/recalculate", RecalculateAllAsync)
-            .RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)));
+            .RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Admin)))
+            .Produces<RecalculationResponse>();
     }
 
     private static async Task<IResult> RecalculateAllAsync(
@@ -72,6 +73,8 @@ public static class PasswordEvaluationEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return Results.Ok(new { updatedEntries });
+        return Results.Ok(new RecalculationResponse(updatedEntries));
     }
 }
+
+public record RecalculationResponse(int UpdatedEntries);

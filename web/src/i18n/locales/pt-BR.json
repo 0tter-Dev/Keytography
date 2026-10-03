@@ -1,0 +1,56 @@
+{
+  "app": {
+    "name": "Keytography",
+    "tagline": "A arte de guardar suas chaves."
+  },
+  "nav": {
+    "label": "Navegação principal",
+    "home": "Início",
+    "vault": "Cofre",
+    "settings": "Configurações",
+    "comingSoon": "Em breve",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Fechar menu",
+    "collapse": "Recolher menu lateral",
+    "expand": "Expandir menu lateral"
+  },
+  "health": {
+    "title": "Estado do sistema",
+    "description": "Verificação fim a fim entre a interface, o cliente tipado e a API.",
+    "status": {
+      "healthy": "Saudável",
+      "degraded": "Degradado",
+      "unhealthy": "Com falha",
+      "unreachable": "API inacessível"
+    },
+    "checks": "Verificações",
+    "recheck": "Verificar novamente",
+    "toast": {
+      "healthy": "A API respondeu como saudável.",
+      "failed": "A API não respondeu como saudável."
+    }
+  },
+  "appearance": {
+    "title": "Aparência (desenvolvimento)",
+    "theme": "Tema",
+    "accent": "Cor de destaque",
+    "themes": {
+      "system": "Sistema",
+      "light": "Claro (creme)",
+      "light-high-contrast": "Claro (alto contraste)",
+      "dark": "Escuro (cinza)",
+      "dark-high-contrast": "Escuro (alto contraste)"
+    },
+    "accents": {
+      "green": "Verde",
+      "lime": "Verde limão",
+      "purple": "Roxo",
+      "red": "Vermelho",
+      "blue": "Azul",
+      "light-blue": "Azul claro",
+      "orange": "Laranja",
+      "yellow": "Amarelo",
+      "pink": "Rosa"
+    }
+  }
+}

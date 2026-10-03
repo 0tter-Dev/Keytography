@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend em desenvolvimento ativo. `keytography-001` a `keytography-006` concluídos — as 4 capabilities do roadmap original (autenticação, cofre, avaliação e geração de senha) estão `implemented`.
+Core/backend completo: `keytography-001` a `keytography-006` concluídos — as 4 capabilities do roadmap original (autenticação, cofre, avaliação e geração de senha) estão `implemented`. Interface web em andamento: `keytography-007` (fundação) está em `review` (PR aberto); `008` a `014` seguem em `backlog`.
 
 ## Milestones
 
@@ -16,6 +16,7 @@ Core/backend em desenvolvimento ativo. `keytography-001` a `keytography-006` con
 - **2026-09-30** — [keytography-004](./plans/completed/keytography-004-password-recovery-completion.md) concluído ([PR #8](https://github.com/0tter-Dev/Keytography/pull/8)): conclusão do fluxo de redefinição de senha (`POST /auth/reset-password`), re-cifragem da cópia "do dono" da DEK sem perda de acesso ao cofre, e histórico da senha de login.
 - **2026-10-01** — [keytography-005](./plans/completed/keytography-005-password-evaluation-engine.md) concluído ([PR #10](https://github.com/0tter-Dev/Keytography/pull/10)): motor de avaliação de força de senha (comprimento, entropia, reuso, complexidade), recálculo automático em criação/edição, e recálculo retroativo sob demanda via decifragem em lote pela chave de recuperação ([ADR-0003](./decisions/ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md)).
 - **2026-10-01** — [keytography-006](./plans/completed/keytography-006-password-generator.md) concluído ([PR #12](https://github.com/0tter-Dev/Keytography/pull/12)): gerador de senha configurável (`POST /passwords/generate`) com CSPRNG, exclusão de caracteres ambíguos, e exigência de força mínima validada pelo motor de `keytography-005`. Fecha o roadmap original de 4 capabilities do `PROJECT-BRIEF.md`.
+- **2026-10-03** — [keytography-007](./plans/review/keytography-007-web-frontend-scaffolding-and-foundation.md) em `review` (PR aberto): fundação da interface web (React + TypeScript + Vite em `web/`, tooling, [convenções](./guides/web-frontend-conventions.md), sistema de temas 5 × 9, i18n `pt-BR`, casca de layout responsiva, cliente de API tipado gerado do [contrato OpenAPI](./reference/README.md), CORS e job de CI do frontend).
 
 ## Capability Dashboard
 
@@ -25,3 +26,4 @@ Core/backend em desenvolvimento ativo. `keytography-001` a `keytography-006` con
 | Entradas de Cofre (Contas/Senhas) | implemented | [vault-entries](./capabilities/vault-entries/README.md) |
 | Avaliação de Senha | implemented | [password-evaluation](./capabilities/password-evaluation/README.md) |
 | Geração de Senha | implemented | [password-generation](./capabilities/password-generation/README.md) |
+| Interface Web | in_progress | [web-interface](./capabilities/web-interface/README.md) |

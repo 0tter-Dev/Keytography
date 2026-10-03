@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Keytography</title>
+    <script>
+      // Anti-flash: aplica tema/destaque salvos ANTES do React montar, para não piscar o tema padrão.
+      // Mantém-se em sincronia com src/features/theme (chave e formato do localStorage).
+      try {
+        var saved = (JSON.parse(localStorage.getItem('keytography.appearance')) || {}).state || {}
+        var theme = saved.theme || 'system'
+        if (theme === 'system') {
+          theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        document.documentElement.dataset.theme = theme
+        document.documentElement.dataset.accent = saved.accent || 'green'
+      } catch (_) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -27,3 +27,40 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Typed API client is up to date with docs/reference/openapi.json
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
