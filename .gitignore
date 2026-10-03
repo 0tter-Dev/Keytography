@@ -31,3 +31,6 @@ Desktop.ini
 /dist/
 /build/
 /out/
+
+# Preferencias pessoais do Claude Code (os hooks do projeto ficam em .claude/settings.json)
+.claude/settings.local.json
