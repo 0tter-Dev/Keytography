@@ -62,6 +62,7 @@ Implementar as telas de autenticação da interface web — registro, verificaç
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar as telas de autenticação implementadas e a estratégia de sessão/rotas protegidas.
+- `README.md` (raiz): Current Scope passa a listar autenticação (registro, verificação de e-mail, login e redefinição de senha) como entregue na interface web; Quick Start descreve o que a interface passa a exigir (login) em vez da tela de estado do sistema.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

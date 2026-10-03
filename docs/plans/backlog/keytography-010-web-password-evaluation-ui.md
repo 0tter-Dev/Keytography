@@ -52,6 +52,7 @@ Exibir, nos formulários de entrada de cofre, a nota de força e o detalhamento 
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar o indicador de força implementado.
+- `README.md` (raiz): Current Scope passa a listar o indicador de força de senha na interface web; Quick Start e Stack: constatação deliberada de que não mudam.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

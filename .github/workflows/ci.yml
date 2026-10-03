@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # `edited` reexecuta a verificação de nomes quando o título do PR muda.
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   build:
@@ -27,6 +29,10 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release
+        env:
+          # Convenção de nomes de branches e PRs (BranchNamingTests); vazias em push, onde o teste não tem o que verificar.
+          KEYTOGRAPHY_PR_BRANCH: ${{ github.head_ref }}
+          KEYTOGRAPHY_PR_TITLE: ${{ github.event.pull_request.title }}
 
   web:
     name: web

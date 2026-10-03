@@ -101,3 +101,15 @@ A interface web (`keytography-007` em diante) é um projeto separado em `web/` (
 | `npm run api:types` | Regenera os tipos do cliente a partir de `docs/reference/openapi.json` |
 
 O contrato da API (`docs/reference/openapi.json`) é gerado pela própria API; ver [docs/reference/README.md](../reference/README.md) para regenerá-lo depois de mudar um endpoint. Convenções de código da interface: [web-frontend-conventions.md](./web-frontend-conventions.md).
+
+## Verificações de governança
+
+`dotnet test` também confere a documentação do repositório (planos, `STATUS.md`/`ROADMAP.md`, links internos, README raiz nos planos) e a convenção de nomes de branches e PRs. Para rodar só essas verificações:
+
+```bash
+dotnet test --filter "FullyQualifiedName~DocumentationGovernance"
+dotnet test --filter "FullyQualifiedName~BranchNaming"
+```
+
+Cada falha indica o arquivo, a regra e como corrigir. Detalhes e o procedimento de exceção: [DOCUMENTATION-GUIDE.md](../DOCUMENTATION-GUIDE.md#verificação-automática-de-governança).
+

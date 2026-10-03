@@ -1,6 +1,6 @@
 ---
 id: keytography-015
-status: backlog
+status: review
 type: chore
 requires_pull_request: true
 expected_version_impact: none
@@ -48,6 +48,18 @@ Decisão de forma: a verificação mora na suíte de testes .NET existente (`tes
 - Qualquer verificação de código de aplicação (backend ou frontend), cobertas pelos testes e pelo CI já existentes.
 
 ## Approval
+
+Aprovado pelo usuário em 2026-10-03, ao responder "Sim, vamos definir as regras do `015` antes de continuar para o `008`", depois de ter o plano (revisado no PR #18), sua decisão de forma (verificador na suíte .NET existente) e a recomendação de ativá-lo antes do `008` apresentados. Ativação fora da ordem de `sequence`, já que o `008` também é elegível: aprovada explicitamente pelo mesmo motivo. Este plano não toca criptografia, autenticação nem controle de acesso por role, e não altera contratos públicos da API; adiciona apenas testes, um passo de CI e documentação.
+
+**Esclarecimentos de implementação (2026-10-03)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite:
+
+- **Primeira execução no repositório real achou desvios de verdade**, como pretendido: o link do `ROADMAP.md` para este plano ainda apontava para `backlog/` depois da ativação, e os planos `008` a `013` não citavam o `README.md` da raiz. Ambos foram corrigidos nesta entrega (o segundo está em `Scope`).
+- **Lacuna adicional corrigida nos planos:** o `012` introduz `POST /auth/change-password`, o que altera o contrato da API; faltavam a linha em `Documentation Updates` e o critério de aceite para regenerar `docs/reference/openapi.json` e `web/src/api/schema.d.ts` (obrigação do ADR-0004). Foram acrescentados. Hoje nenhuma regra automática cobre isso nos planos; o teste de drift do backend e o CI do `web` pegam o esquecimento na implementação.
+- **Regra 6 ignora código:** `{{...}}` dentro de código inline e de blocos de código não conta como resíduo de template (`style={{...}}` aparece legitimamente em `web-frontend-conventions.md`).
+- **Identificador de plano na verificação de nomes:** só ids no formato `keytography-NNN` ativam a exigência de `(<id>)` no título; slugs de trabalho sem plano nunca começam assim. Outros projetos que reaproveitem o verificador ajustam o prefixo em `BranchNaming.cs`.
+- **Execução no CI:** o passo de nomes é o próprio teste `BranchNamingTests`, alimentado por variáveis de ambiente no passo `Test` do job `build`, e o gatilho `pull_request` ganhou o tipo `edited` para reexecutar quando o título muda.
+- **`README.md` da raiz:** constatação deliberada de que não precisa mudar — esta entrega não altera o que o projeto roda, oferece ou usa, nem o Quick Start, o Current Scope ou a Stack.
+- **Capabilities:** `authorized_capabilities` está vazio e nenhuma capability teve comportamento alterado.
 
 ## Acceptance Criteria
 

@@ -61,6 +61,7 @@ A tela completa de configurações de conta (nome de exibição editável, uploa
 - Mudar a preferência de densidade de exibição altera imediatamente a visualização da listagem de cofre (`keytography-009`) e persiste após recarregar a página.
 - Mudar o tema ou a cor de destaque na tela de configurações reflete imediatamente em toda a aplicação, não só na própria tela.
 - O avatar gerado muda de cor ao selecionar uma cor diferente, e persiste após recarregar a página.
+- `docs/reference/openapi.json` e `web/src/api/schema.d.ts` descrevem `POST /auth/change-password` e estão regenerados e comitados (o teste de drift do backend e o job `web` do CI passam).
 - O job `build` do CI (backend e frontend) permanece verde.
 
 ## Validation
@@ -73,7 +74,9 @@ A tela completa de configurações de conta (nome de exibição editável, uploa
 ## Documentation Updates
 
 - `docs/capabilities/authentication-and-users/README.md`: documentar o novo endpoint `POST /auth/change-password` e seu uso da DEK em cache (sem novo ADR — reaproveita `ADR-0001`/`ADR-0002` sem decisão nova).
+- `docs/reference/openapi.json` e `web/src/api/schema.d.ts`: regenerar e comitar na mesma entrega, pois `POST /auth/change-password` altera o contrato da API (obrigação do [ADR-0004](../../decisions/ADR-0004-versioned-openapi-contract.md); o critério de aceite correspondente deve constar do plano).
 - `docs/capabilities/web-interface/README.md`: documentar a tela de configurações, o esquema de avatar gerado, e mover nome de exibição/upload de imagem/cor customizada para a seção de evolução futura (se ainda não estiverem lá).
+- `README.md` (raiz): Current Scope passa a listar as configurações de conta e a troca de senha autenticada na interface web; Quick Start e Stack: constatação deliberada de que não mudam.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
