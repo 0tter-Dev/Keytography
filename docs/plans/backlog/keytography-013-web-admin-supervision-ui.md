@@ -57,6 +57,7 @@ Os endpoints `GET /vault/users/{userId}/entries`, `GET /vault/users/{userId}/ent
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar a área de supervisão implementada e reafirmar que o painel completo (diretório de usuários, métricas) segue como evolução futura.
+- `README.md` (raiz): Current Scope passa a listar a supervisão mínima do Admin na interface web, mantendo o painel completo como fora do escopo atual; Quick Start e Stack: constatação deliberada de que não mudam.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

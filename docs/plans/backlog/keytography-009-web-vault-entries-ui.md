@@ -67,6 +67,7 @@ Implementar a experiência central do produto: listar, criar, editar, excluir (l
 
 - `docs/capabilities/web-interface/README.md`: documentar as telas de cofre implementadas.
 - `docs/capabilities/vault-entries/README.md`: registrar tags/favoritos/grupos-subgrupos como evolução futura (constatação deliberada de que não fazem parte do schema atual).
+- `README.md` (raiz): Current Scope passa a listar o cofre (CRUD de contas e senhas) como entregue na interface web; Quick Start só muda se o primeiro uso passar a depender de algum passo novo.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

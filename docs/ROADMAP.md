@@ -26,7 +26,7 @@ Melhorias do próprio fluxo de trabalho, independentes da interface web (nenhuma
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| high | Verificação automática de governança documental e de convenções de PR | [keytography-015](./plans/backlog/keytography-015-governance-checks-in-ci.md) — sem dependências; é elegível junto com o `008`, então ativá-lo antes exige aprovação explícita (a recomendação é fazê-lo antes: as regras que ele automatiza valem para todas as entregas seguintes) |
+| high | Verificação automática de governança documental e de convenções de PR | [keytography-015](./plans/review/keytography-015-governance-checks-in-ci.md) — **review** (PR aberto; ativado antes do `008` com aprovação explícita do usuário, em 2026-10-03: as regras que ele automatiza valem para todas as entregas seguintes) |
 
 ## Evolução futura (não planejada ainda)
 

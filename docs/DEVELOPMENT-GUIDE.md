@@ -30,6 +30,7 @@ Mudanças exigem revisão explícita quando:
 - O contrato da API consumido pelos clientes vive em `docs/reference/` (ver [docs/reference/README.md](./reference/README.md) e [ADR-0004](./decisions/ADR-0004-versioned-openapi-contract.md)). **Mudou endpoint, DTO ou metadado de resposta? Regenerar e commitar `docs/reference/openapi.json` e `web/src/api/schema.d.ts` na mesma entrega é obrigatório** — o CI falha caso contrário.
 - Decisões duráveis que atravessam múltiplas capabilities vão em `docs/decisions/`.
 - Atualize `docs/STATUS.md` junto de qualquer mudança de implementação relevante.
+- `dotnet test` também valida a governança documental (planos, dashboards, links internos, README raiz nos planos) e, no CI de pull request, os nomes de branch e de PR. Regras e como tratar uma exceção: [DOCUMENTATION-GUIDE.md](./DOCUMENTATION-GUIDE.md#verificação-automática-de-governança).
 - **Revise o `README.md` da raiz** (Quick Start, Current Scope, Stack) em toda entrega que mude o que o projeto roda, oferece ou usa, e registre o resultado em `Documentation Updates` do plano. A lista completa do que revisar ao fechar uma entrega está em [DOCUMENTATION-GUIDE.md](./DOCUMENTATION-GUIDE.md#definição-de-pronto-para-a-documentação-de-uma-entrega).
 
 ## Git Direction

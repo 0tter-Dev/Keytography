@@ -43,3 +43,22 @@ Uma entrega só está pronta quando **toda** a documentação afetada reflete o 
 4. guias afetados (`docs/guides/`), incluindo `running-locally.md` quando mudar como rodar o projeto;
 5. `docs/reference/` — se a API mudou, o contrato versionado e os tipos gerados (ver [ADR-0004](./decisions/ADR-0004-versioned-openapi-contract.md));
 6. ADRs, quando a entrega envolver uma decisão durável.
+
+### Verificação automática de governança
+
+Parte destas regras é verificada por código, na suíte de testes (`tests/Keytography.Tests/DocumentationGovernance/`), e portanto roda em `dotnet test` e no job `build` do CI, que é o check obrigatório da branch protegida. Mensagens de erro dizem arquivo (e linha, quando há), a regra violada e como corrigir.
+
+| Regra (id na mensagem) | O que garante | Protege |
+| --- | --- | --- |
+| `plano` | todo arquivo de plano tem o front matter completo, `status` igual à pasta, nome de arquivo começando pelo `id`, `type` de Conventional Commits, as 8 seções obrigatórias e `depends_on` apontando para planos existentes | o template e o ciclo de vida em [plans/README.md](./plans/README.md) |
+| `ciclo-de-vida` | `completed` tem `Outcome` preenchido e `actual_version_impact` real; `active` e `review` têm `Approval` preenchido e `actual_version_impact: pending` | a regra de que a pasta e o campo `status` concordam e de que o impacto real só entra no fechamento |
+| `dashboard` | todo plano aberto aparece no `ROADMAP.md`, todo plano concluído aparece no `STATUS.md`, e toda capability está no Capability Dashboard com o mesmo status do seu `Current Status` | `STATUS.md` e `ROADMAP.md` como índices fiéis |
+| `link` | todo link relativo de `README.md`, `AGENTS.md` e `docs/**/*.md` aponta para um arquivo existente e, com `#âncora`, para um título existente (âncoras no estilo do GitHub) | "mantenha os links internos válidos" |
+| `readme-raiz` | todo plano `feat` ainda não concluído cita o `README.md` da raiz em `Documentation Updates` (atualização ou constatação deliberada de que não muda); planos concluídos antes da regra ficam isentos | a definição de "pronto" acima, item 2 |
+| `template` | nenhum placeholder `{{...}}` esquecido (código inline e blocos de código são ignorados) | documentos finais sem resíduo de template |
+
+A mesma suíte tem a verificação de nomes de branches e PRs (`BranchNamingTests`): no CI de pull request, a branch deve seguir `<type>/<slug>` e o título do PR deve casar com ela, conforme a seção "Nomes de branches, PRs e planos" do [DEVELOPMENT-GUIDE.md](./DEVELOPMENT-GUIDE.md#nomes-de-branches-prs-e-planos). Branches de `dependabot/` e `renovate/` são isentas.
+
+**Rodar localmente:** `dotnet test --filter "FullyQualifiedName~DocumentationGovernance"` (regras de documentação, contra o repositório real e contra árvores sintéticas) e `dotnet test --filter "FullyQualifiedName~BranchNaming"`. Para reproduzir a verificação de um PR, defina `KEYTOGRAPHY_PR_BRANCH` e `KEYTOGRAPHY_PR_TITLE` antes de rodar o segundo comando.
+
+**Exceções.** Não existe arquivo de exceções nem forma de silenciar uma regra. Uma exceção legítima é uma mudança explícita no verificador, num PR revisado: uma condição ou lista nomeada no código, com o motivo em comentário e um teste que a cobre (exemplos que já existem: a isenção de planos concluídos na regra `readme-raiz` e a lista de prefixos de branch isentos). O verificador garante a **presença** do cuidado com o README raiz e dos demais itens, não a **fidelidade** do conteúdo; essa continua sendo papel da `project-audit`.
