@@ -773,7 +773,7 @@ export interface components {
         };
         CriterionEvaluation: {
             /** Format: double */
-            score: number | string;
+            score: number;
             passed: boolean;
         };
         ForgotPasswordRequest: {
@@ -781,16 +781,16 @@ export interface components {
         };
         GeneratePasswordRequest: {
             /** Format: int32 */
-            length: number | string;
+            length: number;
             includeSymbols: boolean;
             excludeAmbiguousCharacters: boolean;
             /** Format: double */
-            minimumScore: null | number | string;
+            minimumScore: null | number;
         };
         GeneratePasswordResponse: {
             password: string;
             /** Format: double */
-            score: number | string;
+            score: number;
             scoreDetail: {
                 [key: string]: components["schemas"]["CriterionEvaluation"];
             };
@@ -824,7 +824,7 @@ export interface components {
         };
         RecalculationResponse: {
             /** Format: int32 */
-            updatedEntries: number | string;
+            updatedEntries: number;
         };
         RegisterRequest: {
             login: string;
@@ -865,7 +865,7 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             /** Format: double */
-            passwordScore: null | number | string;
+            passwordScore: null | number;
             passwordScoreDetail: null | {
                 [key: string]: components["schemas"]["CriterionEvaluation"];
             };

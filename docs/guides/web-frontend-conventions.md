@@ -62,7 +62,27 @@ Duas dimensões independentes aplicadas como atributos no `<html>`:
 - `data-theme`: `light` (creme), `light-high-contrast` (branco), `dark` (cinza), `dark-high-contrast` (preto). A preferência `system` não é um atributo: é resolvida para `light`/`dark` conforme `prefers-color-scheme` (`features/theme`).
 - `data-accent`: `green` (padrão), `lime`, `purple`, `red`, `blue`, `light-blue`, `orange`, `yellow`, `pink`.
 
-A cor do texto sobre o destaque (`--primary-foreground`) é calculada pela luminosidade do destaque (limiar OKLCH `L = 0.6`, onde preto e branco têm o mesmo contraste) — nunca fixada à mão. Medido no navegador nas 36 combinações tema × destaque: contraste mínimo 5.14:1 (WCAG AA exige 4.5:1). Ao adicionar um destaque ou tema novo, **meça de novo** (texto base, texto secundário e texto sobre destaque).
+### Como usar o destaque (três tokens, três papéis)
+
+| Papel | Token / utilitário | Exemplo |
+| --- | --- | --- |
+| **Preenchimento** (botão principal, item ativo) | `bg-primary` + `text-primary-foreground` | `Button` default, item ativo da navegação |
+| **Traço sobre o fundo** (ícone, anel de foco, borda de realce, texto grande de destaque) | `text-accent-ink`, `ring`/`outline-ring` | ícones da marca, foco global |
+| **Qualquer outra coisa** | **não use o destaque** — use `foreground`, `muted-foreground`, `border` | texto corrido, rótulos |
+
+Por que dois tokens para "o mesmo" destaque: o tom escolhido pelo usuário funciona bem como *preenchimento*, mas alguns (amarelo, limão, azul-claro, verde, laranja, rosa) ficam quase invisíveis como *traço* sobre fundos claros. `--accent-ink` é o **mesmo destaque** (mesmo matiz e croma) com a luminosidade limitada por tema (`--ink-max-l`: 0.58 no claro/creme, 0.55 no claro de alto contraste, sem limite nos escuros), então nunca some contra o fundo. **Não use `text-primary`** para ícones/texto sobre o fundo.
+
+### Contraste: números e guarda automática
+
+Medições (cálculo a partir dos tokens e conferência no navegador, nas 36 combinações tema × destaque):
+
+- texto sobre o destaque (`primary-foreground`, cor escolhida pela luminosidade do destaque; limiar OKLCH `L = 0.6`, onde preto e branco têm o mesmo contraste): **≥ 5.14:1** (WCAG AA exige 4.5:1);
+- destaque como traço (`accent-ink`, foco e ícones) contra `--background` e `--surface`: **≥ 3.4:1** medido no navegador (WCAG 1.4.11 exige 3:1) — antes do `accent-ink` o pior caso era 1.2:1 (amarelo sobre creme);
+- texto e texto secundário sobre fundo/superfície: ≥ 5.5:1 em todos os temas (alto contraste chega a AAA).
+
+Observação: nos temas claros/escuros comuns, o `accent-ink` serve para ícones, foco e texto **grande**; texto pequeno em destaque exigiria 4.5:1 (só os dois temas de alto contraste chegam lá). Bordas de campos de formulário nos temas comuns (`--border`) são decorativas e ficam abaixo de 3:1 — revisar na passada de acessibilidade de `keytography-014`.
+
+**Guarda:** `src/styles/contrast.test.ts` lê os valores reais de `styles/index.css` e falha se qualquer uma dessas garantias regredir (um destaque, tema ou limite alterado sem conferir contraste). Ao adicionar um destaque ou tema novo, o teste já o cobre se ele seguir o mesmo formato de tokens; o que o CSS calcula só em runtime (gamut/mapeamento) continua pedindo uma conferência visual no navegador, registrada no PR.
 
 A preferência é persistida em `localStorage` (`keytography.appearance`); `index.html` aplica o valor salvo antes do React montar, para não piscar o tema padrão. Se mudar a chave ou o formato, atualize os dois lados.
 
@@ -75,7 +95,7 @@ A preferência é persistida em `localStorage` (`keytography.appearance`); `inde
 ## Dados da API
 
 - Toda chamada passa pelo cliente tipado (`api/client.ts`), gerado do contrato [`docs/reference/openapi.json`](../reference/openapi.json). Não escreva `fetch` manual nem tipos de DTO à mão.
-- Mudou um endpoint/DTO na API? Regenerar o contrato e os tipos: ver [docs/reference/README.md](../reference/README.md). O CI falha se o contrato versionado ou `schema.d.ts` ficarem desatualizados.
+- **Mudou um endpoint, DTO ou metadado de resposta na API? Regenerar e commitar o contrato e os tipos na mesma entrega é obrigatório** (procedimento em [docs/reference/README.md](../reference/README.md); decisão em [ADR-0004](../decisions/ADR-0004-versioned-openapi-contract.md)). O teste do backend e o CI do frontend falham se `docs/reference/openapi.json` ou `schema.d.ts` ficarem desatualizados — e um plano que toque a API deve listar o contrato em `Documentation Updates`.
 - Leitura de dados via TanStack Query (cache, loading e erro tratados de forma uniforme).
 
 ## Testes
@@ -86,7 +106,7 @@ A preferência é persistida em `localStorage` (`keytography.appearance`); `inde
 
 ## Acessibilidade mínima
 
-Elementos interativos com nome acessível (`aria-label` traduzido quando só há ícone), navegação por teclado funcional, foco visível (estilo global em `index.css`), ícones decorativos com `aria-hidden`, e primitivos do Radix para diálogo/drawer (foco preso, `Esc`, ARIA).
+Elementos interativos com nome acessível (`aria-label` traduzido quando só há ícone), navegação por teclado funcional, foco visível (anel global em `index.css` usando `--ring` = `accent-ink`, com contraste ≥ 3:1 garantido pela guarda de contraste), ícones decorativos com `aria-hidden`, e primitivos do Radix para diálogo/drawer (foco preso, `Esc`, ARIA).
 
 ## Notas de manutenção
 

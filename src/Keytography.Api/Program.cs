@@ -1,5 +1,6 @@
 using Keytography.Api.Auth;
 using Keytography.Api.Health;
+using Keytography.Api.OpenApi;
 using Keytography.Api.PasswordEvaluation;
 using Keytography.Api.PasswordGeneration;
 using Keytography.Api.Vault;
@@ -31,7 +32,7 @@ builder.Services.AddDbContext<KeytographyDbContext>((serviceProvider, options) =
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<KeytographyDbContext>("database");
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddSchemaTransformer<NumericSchemaTransformer>());
 
 // Origens permitidas lidas via DI (apos builder.Build()) para respeitar overrides de
 // configuracao de teste. Padrao: servidor de desenvolvimento do Vite (web/).

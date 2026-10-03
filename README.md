@@ -8,27 +8,47 @@ Nome, tagline e direção visual estão documentados em [docs/guides/identity.md
 
 ## Quick Start
 
-O core/backend já roda localmente. Veja [docs/guides/running-locally.md](./docs/guides/running-locally.md) para compilar, testar e subir a API (`dotnet run --project src/Keytography.Api`, com `GET /health` disponível). A interface web ainda não existe — está planejada em [docs/plans/backlog/](./docs/plans/backlog/) (`keytography-007` em diante). Veja [docs/STATUS.md](./docs/STATUS.md) para o estágio atual.
+Detalhes e pré-requisitos (incluindo os segredos locais exigidos pela API) em [docs/guides/running-locally.md](./docs/guides/running-locally.md).
+
+**API (backend):**
+
+```bash
+dotnet run --project src/Keytography.Api
+```
+
+Sobe em `http://localhost:5247`; `GET /health` confirma que está de pé.
+
+**Interface web** (em outro terminal, com a API rodando):
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Abre em `http://localhost:5173`. Hoje a interface entrega a fundação (layout responsivo, temas, cliente de API tipado) e uma tela com o estado do sistema; as telas de autenticação, cofre, avaliação e geração de senha ainda estão em desenvolvimento — veja [docs/ROADMAP.md](./docs/ROADMAP.md) e [docs/STATUS.md](./docs/STATUS.md).
 
 ## Current Scope
+
+**Core/backend — implementado:**
 
 - Autenticação de usuários multiusuário (roles `Admin` e `Member`)
 - CRUD de contas e senhas com criptografia e histórico
 - Avaliação de força de senha por critérios modulares
 - Geração de senhas fortes com exigência de força mínima
 
-As quatro capabilities acima estão **implementadas** no core/backend. A interface web está em planejamento (ver [ROADMAP.md](./docs/ROADMAP.md)), como primeira interface de usuário do projeto, antes de portar para Mobile e Desktop.
+**Interface web — em andamento:** fundação entregue (React + TypeScript + Vite, sistema de temas, i18n `pt-BR`, casca de layout responsiva, cliente tipado gerado do contrato da API). As telas funcionais estão planejadas em sequência (`keytography-008` a `014`). Mobile e Desktop só começam depois que a interface web estiver consolidada.
 
 Out of scope for now: sincronização em nuvem, compartilhamento de senhas entre usuários, 2FA/TOTP embutido, extensão de navegador.
 
 ## Documentation
 
-Para documentação completa, comece por [Start Here](./docs/START-HERE.md).
+Para documentação completa, comece por [Start Here](./docs/START-HERE.md). O contrato da API consumido pelos clientes está em [docs/reference/](./docs/reference/README.md); as convenções de código de interface, em [docs/guides/web-frontend-conventions.md](./docs/guides/web-frontend-conventions.md).
 
 ## Stack
 
 - **Backend:** C# / ASP.NET Core (.NET 10), Entity Framework Core + SQLite.
-- **Frontend web:** React + TypeScript + Vite (planejado — ver `keytography-007` em diante).
+- **Frontend web:** React + TypeScript + Vite, Tailwind CSS, com cliente de API tipado gerado do contrato OpenAPI versionado.
 
 Ver [Selected Technology Direction](./docs/PROJECT-ARCHITECTURE.md#selected-technology-direction) para o detalhe e o raciocínio de cada escolha.
 

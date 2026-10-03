@@ -10,7 +10,8 @@ sequence: 7
 depends_on: [keytography-006]
 authorized_capabilities:
   - docs/capabilities/web-interface/README.md
-decision_records: []
+decision_records:
+  - docs/decisions/ADR-0004-versioned-openapi-contract.md
 validation: []
 documentation_updates: []
 ---
@@ -58,6 +59,13 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 - **Contrato versionado** em `docs/reference/openapi.json` + teste de backend contra drift, em vez de gerar o OpenAPI em tempo de build (a inicialização da API exige segredos locais, indisponíveis no build).
 - **`overrides` escopado** no `package.json` do `web/` para `openapi-typescript` (peer `typescript@^5`) usar o TypeScript 6 do projeto.
 
+**Ajustes após a `project-audit` (2026-10-03), aprovados pelo usuário:**
+
+- Campos numéricos do OpenAPI voltaram a `number`/`integer` (o ASP.NET Core os descrevia como `number | string` por aceitar números como texto na leitura): `NumericSchemaTransformer` + teste de regressão; contrato e tipos regenerados.
+- Novo token `--accent-ink` (mesmo destaque, luminosidade limitada por tema) para foco e ícones, porque o destaque cru ficava abaixo de 3:1 contra fundos claros em 12 das 36 combinações (pior: amarelo sobre creme, 1.2:1). Teste automático `contrast.test.ts` lê os tokens reais e protege tudo isso.
+- Política do contrato versionado formalizada em [ADR-0004](../../decisions/ADR-0004-versioned-openapi-contract.md), com a obrigação de manutenção explícita.
+- O `README.md` da raiz não estava coberto pelo plano; passou a constar em `Acceptance Criteria` e `Documentation Updates`, e a regra foi tornada explícita nos documentos de governança para não se repetir.
+
 ## Acceptance Criteria
 
 - `npm run build` produz um bundle de produção sem erros; `npm run dev` sobe o servidor de desenvolvimento.
@@ -67,6 +75,9 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 - Uma string de texto editada no arquivo de tradução `pt-BR` se reflete na tela sem alterar nenhum componente.
 - A tela de prova de vida exibe o status de `/health` corretamente nos dois temas (claro/escuro) e em larguras de viewport mobile e desktop.
 - O guia `docs/guides/web-frontend-conventions.md` existe e é referenciado por `docs/DEVELOPMENT-GUIDE.md`.
+- O destaque usado como traço sobre o fundo (anel de foco, ícones) tem contraste ≥ 3:1 contra fundo e superfície nas 36 combinações tema × destaque (via `accent-ink`), e o texto sobre o destaque ≥ 4.5:1 — garantido por um teste automático que lê os tokens reais de `index.css`.
+- O contrato OpenAPI descreve campos numéricos como `number`/`integer` (nunca `number | string`), e o `schema.d.ts` gerado reflete isso.
+- O `README.md` da raiz reflete o estado real após a entrega (Quick Start com o frontend, Current Scope, Stack) e as regras de manutenção da documentação (README raiz e contrato da API) estão explícitas em `AGENTS.md`, `DEVELOPMENT-GUIDE.md`, `DOCUMENTATION-GUIDE.md` e `docs/plans/README.md`.
 - O CI passa com o novo job/etapa de frontend incluído.
 
 ## Validation
@@ -82,6 +93,9 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 - `docs/guides/running-locally.md`: adicionar os passos para rodar o frontend localmente (`npm install`, `npm run dev`), e a nova variável de origem/CORS se aplicável.
 - `docs/guides/web-frontend-conventions.md` (novo) e `docs/reference/README.md` + `docs/reference/openapi.json` (novos): criados por este plano; `docs/START-HERE.md` deixa de dizer que `reference/` está vazio.
 - Capabilities de backend (`authentication-and-users`, `vault-entries`, `password-evaluation`, `password-generation`): constatação deliberada de que **não** precisam de atualização — só ganharam metadados de resposta no OpenAPI, sem mudança de comportamento (ver `Approval`).
+- `README.md` (raiz): Quick Start (backend + frontend), Current Scope e Stack refletindo o estado real após esta entrega.
+- `docs/decisions/ADR-0004-versioned-openapi-contract.md` (novo) e `docs/decisions/README.md`: registram a política do contrato OpenAPI versionado e a obrigação de mantê-lo.
+- `AGENTS.md`, `docs/DEVELOPMENT-GUIDE.md`, `docs/DOCUMENTATION-GUIDE.md`, `docs/plans/README.md`: regras explícitas de que o `README.md` da raiz e o contrato da API fazem parte da definição de "pronto" de uma entrega.
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

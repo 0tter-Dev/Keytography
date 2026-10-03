@@ -8,7 +8,7 @@ Este guia define o sistema de documentação do Keytography, para que ele susten
 
 | Area | Owns | Does not own |
 | --- | --- | --- |
-| Root documents | escopo do produto, regras de engenharia, status, roadmap | narrativa de implementação em nível de feature |
+| Root documents (`README.md`, `docs/PROJECT-ARCHITECTURE.md`, `docs/STATUS.md`, `docs/ROADMAP.md`, ...) | escopo do produto, regras de engenharia, status, roadmap; o `README.md` da raiz é a porta de entrada (Quick Start, Current Scope, Stack) | narrativa de implementação em nível de feature |
 | `capabilities/` | comportamento atual canônico, invariantes, contratos | planejamento temporário ou justificativa cross-cutting |
 | `reference/` | contratos e definições estáveis | instruções procedurais |
 | `guides/` | instruções orientadas a tarefas | regras canônicas de feature |
@@ -32,3 +32,14 @@ Use um ADR apenas para decisões que afetam múltiplas capabilities, a arquitetu
 ## Maintenance
 
 Mantenha os links internos válidos. Atualize a capability, guide, plan, ou ADR dona do fato junto de qualquer mudança relevante de comportamento ou governança.
+
+### Definição de "pronto" para a documentação de uma entrega
+
+Uma entrega só está pronta quando **toda** a documentação afetada reflete o que foi implementado — não só a capability principal. Ao fechar uma entrega, revise explicitamente cada item, e registre em `Documentation Updates` do plano ou o que foi atualizado, ou a constatação deliberada de que não precisa mudar (nunca omissão silenciosa):
+
+1. as capabilities em `authorized_capabilities` cujo comportamento mudou;
+2. **`README.md` da raiz** — Quick Start (o que dá para rodar e como), Current Scope (o que está implementado vs. planejado) e Stack. É a primeira coisa que um leitor novo vê; já ficou congelado no estágio de kickoff uma vez, e **deve ser revisado em toda entrega que mude o que o projeto roda, oferece ou usa**;
+3. `docs/STATUS.md` e `docs/ROADMAP.md`;
+4. guias afetados (`docs/guides/`), incluindo `running-locally.md` quando mudar como rodar o projeto;
+5. `docs/reference/` — se a API mudou, o contrato versionado e os tipos gerados (ver [ADR-0004](./decisions/ADR-0004-versioned-openapi-contract.md));
+6. ADRs, quando a entrega envolver uma decisão durável.

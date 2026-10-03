@@ -4,6 +4,10 @@
 
 Contrato estável da API HTTP do Keytography, consumido pelos clientes (hoje, a interface web). A fonte é o próprio código da API: o arquivo [`openapi.json`](./openapi.json) é o documento OpenAPI gerado por ela e versionado aqui.
 
+## Manutenção obrigatória
+
+**Quem muda a API é responsável por manter o contrato atualizado, na mesma entrega.** Mudou um endpoint, um DTO, um metadado de resposta (`Produces<T>()`) ou o schema transformer? Regenere e commite **`docs/reference/openapi.json` e `web/src/api/schema.d.ts`** (procedimento abaixo). Isso vale para humanos e agentes e faz parte de "pronto" de qualquer plano que toque a API — um plano assim deve listar este contrato em `Documentation Updates`. Esquecer não passa: o teste do backend e o CI do frontend falham. Decisão e motivos: [ADR-0004](../decisions/ADR-0004-versioned-openapi-contract.md).
+
 ## Como o contrato é usado
 
 - **Cliente da interface web:** `web/src/api/schema.d.ts` (tipos TypeScript) é gerado a partir deste arquivo — ver [convenções da interface](../guides/web-frontend-conventions.md#dados-da-api).
@@ -26,10 +30,11 @@ cd web
 npm run api:types
 ```
 
-Comite `docs/reference/openapi.json` e `web/src/api/schema.d.ts` juntos com a mudança da API.
+Comite `docs/reference/openapi.json` e `web/src/api/schema.d.ts` juntos com a mudança da API (o CI do `web` roda `npm run api:types` e falha se `schema.d.ts` divergir).
 
 ## Notas
 
 - O documento é exposto pela API apenas em ambiente `Development` (`GET /openapi/v1.json`).
+- Campos numéricos são descritos como `number`/`integer` (um schema transformer remove a alternativa `string` que o ASP.NET Core acrescenta por aceitar números como texto na leitura); um teste impede a regressão.
 - O campo `servers` é removido do arquivo versionado (varia conforme o host em que a API roda e não faz parte do contrato).
 - Segurança: o contrato descreve rotas e DTOs; autenticação continua sendo `Authorization: Bearer <JWT>` obtido em `POST /auth/login`.

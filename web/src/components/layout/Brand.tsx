@@ -10,7 +10,7 @@ export function Emblem({ className, ...props }: ComponentProps<'svg'>) {
     <svg
       viewBox="0 0 64 64"
       aria-hidden="true"
-      className={cn('size-8 text-primary', className)}
+      className={cn('size-8 text-accent-ink', className)}
       {...props}
     >
       <mask id={maskId}>
@@ -38,7 +38,7 @@ export function Wordmark({ className }: { className?: string }) {
         className,
       )}
     >
-      <KeyRound aria-hidden="true" className="size-5 text-primary" />
+      <KeyRound aria-hidden="true" className="size-5 text-accent-ink" />
       {t('app.name')}
     </span>
   )

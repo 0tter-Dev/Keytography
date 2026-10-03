@@ -18,6 +18,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    css: false,
+    // `?raw` de index.css (guarda de contraste) volta vazio com css:false.
+    css: true,
   },
 })

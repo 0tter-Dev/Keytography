@@ -59,6 +59,22 @@ public class WebClientSupportTests : IDisposable
     }
 
     [Fact]
+    public async Task Openapi_numeric_fields_are_not_described_as_number_or_string()
+    {
+        var document = await FetchNormalizedOpenApiAsync();
+        var offenders = new List<string>();
+        CollectNumberOrStringSchemas(document, "#", offenders);
+
+        Assert.True(
+            offenders.Count == 0,
+            "Campos numericos descritos como number|string (a API so emite numeros): " + string.Join(", ", offenders));
+
+        // Sanidade: os campos continuam descritos como numericos, nao removidos.
+        var score = document["components"]!["schemas"]!["CriterionEvaluation"]!["properties"]!["score"]!;
+        Assert.Equal("number", score["type"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Committed_openapi_contract_matches_the_running_api()
     {
         var actual = await FetchNormalizedOpenApiAsync();
@@ -88,6 +104,36 @@ public class WebClientSupportTests : IDisposable
         // O servidor reportado varia conforme o host em que a API roda - nao faz parte do contrato.
         document.AsObject().Remove("servers");
         return document;
+    }
+
+    private static void CollectNumberOrStringSchemas(JsonNode? node, string path, List<string> offenders)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                if (obj["type"] is JsonArray types)
+                {
+                    var names = types.Select(t => t?.GetValue<string>()).ToList();
+                    if (names.Contains("string") && (names.Contains("number") || names.Contains("integer")))
+                    {
+                        offenders.Add(path);
+                    }
+                }
+
+                foreach (var (key, value) in obj)
+                {
+                    CollectNumberOrStringSchemas(value, $"{path}/{key}", offenders);
+                }
+
+                break;
+            case JsonArray array:
+                for (var i = 0; i < array.Count; i++)
+                {
+                    CollectNumberOrStringSchemas(array[i], $"{path}/{i}", offenders);
+                }
+
+                break;
+        }
     }
 
     private static string Serialize(JsonNode node) =>

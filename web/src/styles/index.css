@@ -24,6 +24,7 @@
   --color-ring: var(--ring);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-accent-ink: var(--accent-ink);
   --color-success: var(--success);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
@@ -90,7 +91,16 @@
    */
   --primary: var(--accent);
   --primary-foreground: oklch(from var(--accent) clamp(0, (0.6 - l) * 1000, 1) 0 0);
-  --ring: var(--accent);
+
+  /*
+   * "Tinta" do destaque: o MESMO destaque escolhido (mesmo matiz e croma), com a luminosidade
+   * limitada por tema (--ink-max-l) para nunca ficar apagado contra o fundo. Use `accent-ink`
+   * (text-accent-ink, ring...) quando o destaque for traço sobre o fundo: foco, ícone, texto.
+   * Preenchimentos (botão, item ativo) continuam usando `primary` + `primary-foreground`.
+   * Meta: >= 3:1 contra --background e --surface (WCAG 1.4.11) nas 36 combinações.
+   */
+  --accent-ink: oklch(from var(--accent) min(l, var(--ink-max-l)) c h);
+  --ring: var(--accent-ink);
 }
 
 /* ---------- Cores de destaque (independentes do tema) ---------- */
@@ -129,6 +139,7 @@
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
+  --ink-max-l: 0.58;
   --background: oklch(0.96 0.02 85);
   --foreground: oklch(0.25 0.02 60);
   --surface: oklch(0.985 0.012 85);
@@ -141,6 +152,7 @@
 /* Claro (Alto Contraste): branco */
 :root[data-theme='light-high-contrast'] {
   color-scheme: light;
+  --ink-max-l: 0.55;
   --background: oklch(1 0 0);
   --foreground: oklch(0 0 0);
   --surface: oklch(1 0 0);
@@ -153,6 +165,7 @@
 /* Escuro: cinza */
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --ink-max-l: 1;
   --background: oklch(0.21 0.006 260);
   --foreground: oklch(0.95 0 0);
   --surface: oklch(0.26 0.006 260);
@@ -165,6 +178,7 @@
 /* Escuro (Alto Contraste): preto */
 :root[data-theme='dark-high-contrast'] {
   color-scheme: dark;
+  --ink-max-l: 1;
   --background: oklch(0 0 0);
   --foreground: oklch(1 0 0);
   --surface: oklch(0.12 0 0);
