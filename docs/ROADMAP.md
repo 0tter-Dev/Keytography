@@ -2,7 +2,7 @@
 
 Índice compacto e ordenado do trabalho futuro. Cada linha linka para o plano com o detalhe real — este arquivo nunca carrega a narrativa completa.
 
-`keytography-001` a `keytography-006` foram concluídos — ver [docs/plans/completed/](./plans/completed/) — e fecham o roadmap original das 4 capabilities definidas no `PROJECT-BRIEF.md` (autenticação, cofre, avaliação e geração de senha). `keytography-007` (fundação da interface web) também está concluído.
+`keytography-001` a `keytography-006` foram concluídos — ver [docs/plans/completed/](./plans/completed/) — e fecham o roadmap original das 4 capabilities definidas no `PROJECT-BRIEF.md` (autenticação, cofre, avaliação e geração de senha). `keytography-007` (fundação da interface web) e `keytography-015` (governança automatizada) também estão concluídos.
 
 ## Interface Web (fase atual)
 
@@ -24,9 +24,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 Melhorias do próprio fluxo de trabalho, independentes da interface web (nenhuma depende de `keytography-007` a `014`).
 
-| Priority | Item | Notes |
-| --- | --- | --- |
-| high | Verificação automática de governança documental e de convenções de PR | [keytography-015](./plans/review/keytography-015-governance-checks-in-ci.md) — **review** (PR aberto; ativado antes do `008` com aprovação explícita do usuário, em 2026-10-03: as regras que ele automatiza valem para todas as entregas seguintes) |
+Nenhum item aberto no momento. `keytography-015` (verificação automática de governança documental e de convenções de PR) está concluído.
 
 ## Evolução futura (não planejada ainda)
 

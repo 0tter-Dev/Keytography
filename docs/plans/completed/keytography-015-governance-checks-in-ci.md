@@ -1,10 +1,10 @@
 ---
 id: keytography-015
-status: review
+status: completed
 type: chore
 requires_pull_request: true
 expected_version_impact: none
-actual_version_impact: pending
+actual_version_impact: none
 priority: high
 sequence: 15
 depends_on: []
@@ -87,3 +87,12 @@ Aprovado pelo usuário em 2026-10-03, ao responder "Sim, vamos definir as regras
 - `docs/STATUS.md` e `docs/ROADMAP.md`: refletir o novo status.
 
 ## Outcome
+
+Entregue via [PR #21](https://github.com/0tter-Dev/Keytography/pull/21), mergeada em `main` no commit `940769c` em 2026-10-03. Commit de implementação: `d5982fd` (verificador de governança documental na suíte de testes, verificação de nomes de branches e PRs no CI, correção dos desvios que ele encontrou, e documentação). O CI passou no PR (jobs `build` e `web`) e na `main` depois do merge.
+
+Entrega: o verificador (`tests/Keytography.Tests/DocumentationGovernance/`) cobre as seis regras de documentação (`plano`, `ciclo-de-vida`, `dashboard`, `link`, `readme-raiz`, `template`) e o teste `BranchNamingTests` valida branch e título de PR no `pull_request` do job `build` (com o tipo `edited` no gatilho). Já na primeira execução contra o repositório real ele achou o link do `ROADMAP.md` para o plano ainda apontando para `backlog/` e a ausência do `README.md` da raiz nos planos `008` a `013`; também foi acrescentada ao plano `012` a linha e o critério de aceite do contrato da API (`POST /auth/change-password`, ADR-0004). Esclarecimentos de implementação estão em `Approval`.
+
+Validação final: `dotnet build` com 0 avisos e `dotnet test` com 84/84 testes passando em Debug e Release (37 já existentes mais 47 novos; cada regra tem um teste com repositório sintético que a viola), 8/8 testes dos hooks, e mutação manual nos arquivos reais (link quebrado, `status` divergente da pasta, plano fora do `ROADMAP.md`) falhando com mensagem útil e voltando a passar após restaurar. A `project-audit` não foi executada sobre este PR. `actual_version_impact: none` — coerente com `expected_version_impact`, sem divergência a justificar (somente testes, CI e documentação; nenhum comportamento do produto mudou).
+
+Pendências conhecidas: o job do CI não está marcado como obrigatório além do `build` (que já inclui as verificações; ajuste da branch protection fica com o administrador); a verificação do prefixo de plano em `BranchNaming.cs` é específica deste projeto; e nenhuma regra automática cobre ainda a presença do contrato da API em `Documentation Updates` de planos que alteram endpoints.
+
