@@ -20,6 +20,14 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 `keytography-007` foi concluído em 2026-10-03. Os planos acima permanecem em `backlog` — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
 
+## Processo e governança
+
+Melhorias do próprio fluxo de trabalho, independentes da interface web (nenhuma depende de `keytography-007` a `014`).
+
+| Priority | Item | Notes |
+| --- | --- | --- |
+| high | Verificação automática de governança documental e de convenções de PR | [keytography-015](./plans/backlog/keytography-015-governance-checks-in-ci.md) — sem dependências; é elegível junto com o `008`, então ativá-lo antes exige aprovação explícita (a recomendação é fazê-lo antes: as regras que ele automatiza valem para todas as entregas seguintes) |
+
 ## Evolução futura (não planejada ainda)
 
 Ideias discutidas durante o planejamento da interface web, deliberadamente fora do escopo atual — ver [web-interface](./capabilities/web-interface/README.md#future-considerations) e [vault-entries](./capabilities/vault-entries/README.md) para o detalhe de cada uma:
