@@ -1,6 +1,6 @@
 ---
 id: keytography-007
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -48,6 +48,16 @@ O core/backend está completo (`keytography-001` a `006`). Esta é a primeira en
 
 ## Approval
 
+Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a implementação do próximo passo do `ROADMAP.md` (este plano). A stack (React + TypeScript + Vite) e a lista de bibliotecas deste `Scope` foram discutidas e aprovadas durante o planejamento (`project-plans`, 2026-10-01/02). Este plano não toca criptografia, autenticação nem controle de acesso por role (a mudança de CORS e a exposição do OpenAPI não alteram nenhuma regra de acesso existente).
+
+**Esclarecimentos de implementação (2026-10-03)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite, registrados para a revisão:
+
+- **Bibliotecas adiadas** (diretriz do usuário de evitar "usos extras"): `motion`, `@formkit/auto-animate`, `cmdk`, React Hook Form + Zod **não** foram instaladas aqui, pois nenhum código desta entrega as usa; entram no plano que as consome (`008` formulários; `014` animações/command palette). Tabela em `docs/guides/web-frontend-conventions.md`. Foi acrescentado `openapi-fetch`, par oficial do `openapi-typescript` para o cliente tipado.
+- **Metadados de resposta nos endpoints existentes**: sem eles o OpenAPI não descreve os DTOs de retorno (os handlers devolvem `IResult`) e o cliente tipado ficaria vazio. Foram adicionados `.Produces<T>()` aos endpoints de `authentication-and-users`, `vault-entries`, `password-evaluation` e `password-generation`, e três respostas anônimas (`{ message }`, `{ updatedEntries }`) viraram records (`MessageResponse`, `RecalculationResponse`) com o **mesmo formato JSON**. Nenhum comportamento mudou, por isso as docs dessas capabilities (fora de `authorized_capabilities`) não foram tocadas.
+- **`GET /health` como `MapGet`** (em vez de `MapHealthChecks`): endpoints de health check não entram no OpenAPI. Mesmo caminho, mesmo JSON (`status` + `checks[{name,status}]`), mesmos códigos (200; 503 se `Unhealthy`); coberto pelo teste existente `HealthCheckTests`.
+- **Contrato versionado** em `docs/reference/openapi.json` + teste de backend contra drift, em vez de gerar o OpenAPI em tempo de build (a inicialização da API exige segredos locais, indisponíveis no build).
+- **`overrides` escopado** no `package.json` do `web/` para `openapi-typescript` (peer `typescript@^5`) usar o TypeScript 6 do projeto.
+
 ## Acceptance Criteria
 
 - `npm run build` produz um bundle de produção sem erros; `npm run dev` sobe o servidor de desenvolvimento.
@@ -70,6 +80,8 @@ O core/backend está completo (`keytography-001` a `006`). Esta é a primeira en
 - `docs/capabilities/web-interface/README.md`: `Current Status` para `in_progress` (fundação criada, ainda sem telas funcionais); documentar o sistema de theming e i18n efetivamente implementados.
 - `docs/DEVELOPMENT-GUIDE.md`: referenciar `docs/guides/web-frontend-conventions.md` nas Documentation Rules.
 - `docs/guides/running-locally.md`: adicionar os passos para rodar o frontend localmente (`npm install`, `npm run dev`), e a nova variável de origem/CORS se aplicável.
+- `docs/guides/web-frontend-conventions.md` (novo) e `docs/reference/README.md` + `docs/reference/openapi.json` (novos): criados por este plano; `docs/START-HERE.md` deixa de dizer que `reference/` está vazio.
+- Capabilities de backend (`authentication-and-users`, `vault-entries`, `password-evaluation`, `password-generation`): constatação deliberada de que **não** precisam de atualização — só ganharam metadados de resposta no OpenAPI, sem mudança de comportamento (ver `Approval`).
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

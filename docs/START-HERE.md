@@ -25,6 +25,6 @@ Um plano ativo pode autorizar exatamente os documentos de capability necessário
 
 - [Capabilities](./capabilities/): comportamento atual de cada módulo.
 - [Guides](./guides/): instruções orientadas a tarefas — inclui a [identidade do projeto](./guides/identity.md) (nome, tagline, direção visual).
-- [Reference](./reference/): contratos e definições estáveis (ainda nenhum — criado quando uma interface se estabilizar).
+- [Reference](./reference/): contratos e definições estáveis — hoje, o contrato OpenAPI da API.
 - [Decisions](./decisions/): decisões duráveis que atravessam múltiplos módulos.
 - [Plans](./plans/): trabalho futuro aprovado e resultados concluídos.

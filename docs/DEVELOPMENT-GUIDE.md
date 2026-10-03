@@ -26,6 +26,8 @@ Mudanças exigem revisão explícita quando:
 - Comportamento novo de uma capability vai em `docs/capabilities/<slug>/README.md`.
 - Mudanças de escopo ou política vão em `docs/PROJECT-ARCHITECTURE.md`.
 - Mudanças de fluxo de uso voltadas ao usuário final vão em `docs/guides/`.
+- Convenções de código de interface (componentes, estilo, tokens, i18n, testes) vivem em [docs/guides/web-frontend-conventions.md](./guides/web-frontend-conventions.md) e valem como padrão geral para qualquer implementação de interface do projeto.
+- O contrato da API consumido pelos clientes vive em `docs/reference/` (ver [docs/reference/README.md](./reference/README.md)); mudou endpoint ou DTO, regenere-o.
 - Decisões duráveis que atravessam múltiplas capabilities vão em `docs/decisions/`.
 - Atualize `docs/STATUS.md` junto de qualquer mudança de implementação relevante.
 

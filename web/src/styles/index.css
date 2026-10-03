@@ -1,0 +1,204 @@
+@import 'tailwindcss';
+
+/*
+ * Tokens de design do Keytography. Componentes usam SOMENTE utilitários semânticos
+ * (bg-background, text-foreground, border-border, bg-primary...) — nunca cores cruas.
+ * Ver docs/guides/web-frontend-conventions.md.
+ *
+ * Duas dimensões independentes, aplicadas como atributos no <html>:
+ *   data-theme  -> superfícies/texto (light | light-high-contrast | dark | dark-high-contrast)
+ *   data-accent -> cor de destaque (--accent)
+ * O tema "system" não é um atributo: é resolvido para light/dark em runtime
+ * (ver src/features/theme).
+ */
+
+/* ---------- Mapeamento dos tokens para utilitários do Tailwind ---------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+
+  --animate-drawer-in: drawer-in 220ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-drawer-out: drawer-out 160ms cubic-bezier(0.4, 0, 1, 1);
+  --animate-overlay-in: overlay-in 220ms ease-out;
+  --animate-overlay-out: overlay-out 160ms ease-in;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes drawer-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---------- Valores comuns a todos os temas ---------- */
+:root {
+  --radius: 0.625rem;
+  --success: oklch(0.7 0.17 150);
+  --destructive: oklch(0.62 0.23 27);
+  --destructive-foreground: oklch(1 0 0);
+
+  /*
+   * Cor de texto sobre o destaque calculada pela luminosidade (não fixa): branco sobre destaque
+   * escuro, preto sobre destaque claro. O limiar 0.6 (L do OKLCH) é onde preto e branco têm o
+   * mesmo contraste; com ele os 9 destaques ficam >= 4.5:1 (WCAG AA) — medido no navegador.
+   */
+  --primary: var(--accent);
+  --primary-foreground: oklch(from var(--accent) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+  --ring: var(--accent);
+}
+
+/* ---------- Cores de destaque (independentes do tema) ---------- */
+:root,
+:root[data-accent='green'] {
+  --accent: oklch(0.72 0.19 150);
+}
+:root[data-accent='lime'] {
+  --accent: oklch(0.86 0.22 125);
+}
+:root[data-accent='purple'] {
+  --accent: oklch(0.62 0.22 300);
+}
+:root[data-accent='red'] {
+  --accent: oklch(0.62 0.23 27);
+}
+:root[data-accent='blue'] {
+  --accent: oklch(0.62 0.2 255);
+}
+:root[data-accent='light-blue'] {
+  --accent: oklch(0.78 0.13 230);
+}
+:root[data-accent='orange'] {
+  --accent: oklch(0.74 0.18 55);
+}
+:root[data-accent='yellow'] {
+  --accent: oklch(0.9 0.18 100);
+}
+:root[data-accent='pink'] {
+  --accent: oklch(0.72 0.22 350);
+}
+
+/* ---------- Temas (superfícies e texto) ---------- */
+
+/* Claro: creme/bege */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: oklch(0.96 0.02 85);
+  --foreground: oklch(0.25 0.02 60);
+  --surface: oklch(0.985 0.012 85);
+  --surface-foreground: oklch(0.25 0.02 60);
+  --muted: oklch(0.92 0.02 85);
+  --muted-foreground: oklch(0.45 0.02 70);
+  --border: oklch(0.86 0.02 85);
+}
+
+/* Claro (Alto Contraste): branco */
+:root[data-theme='light-high-contrast'] {
+  color-scheme: light;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0 0 0);
+  --surface: oklch(1 0 0);
+  --surface-foreground: oklch(0 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.3 0 0);
+  --border: oklch(0.25 0 0);
+}
+
+/* Escuro: cinza */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: oklch(0.21 0.006 260);
+  --foreground: oklch(0.95 0 0);
+  --surface: oklch(0.26 0.006 260);
+  --surface-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.3 0.006 260);
+  --muted-foreground: oklch(0.72 0.005 260);
+  --border: oklch(0.36 0.006 260);
+}
+
+/* Escuro (Alto Contraste): preto */
+:root[data-theme='dark-high-contrast'] {
+  color-scheme: dark;
+  --background: oklch(0 0 0);
+  --foreground: oklch(1 0 0);
+  --surface: oklch(0.12 0 0);
+  --surface-foreground: oklch(1 0 0);
+  --muted: oklch(0.18 0 0);
+  --muted-foreground: oklch(0.85 0 0);
+  --border: oklch(0.8 0 0);
+}
+
+/* ---------- Base ---------- */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  body {
+    @apply min-h-dvh;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

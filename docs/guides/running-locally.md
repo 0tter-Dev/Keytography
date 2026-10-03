@@ -30,7 +30,7 @@ Passos para compilar, testar e rodar o backend do Keytography localmente. São o
    Na primeira execução, o banco SQLite (`keytography.db`, arquivo local não versionado) é criado automaticamente via migration do EF Core.
 5. Verificar que a API está de pé:
    ```
-   curl http://localhost:5299/health
+   curl http://localhost:5247/health
    ```
    Deve retornar HTTP 200 com um corpo indicando `"status":"healthy"`, incluindo o check do banco de dados.
 
@@ -71,3 +71,33 @@ Para gerar uma nova migration depois de alterar o modelo em `Keytography.Infrast
 ```
 dotnet ef migrations add <Nome> --project src/Keytography.Infrastructure --startup-project src/Keytography.Api --output-dir Migrations
 ```
+
+## Interface web (`web/`)
+
+A interface web (`keytography-007` em diante) é um projeto separado em `web/` (React + TypeScript + Vite), com toolchain Node/npm.
+
+**Pré-requisitos:** Node.js 22.12 ou superior (o CI usa Node 24) e a API rodando localmente (seção [Steps](#steps)).
+
+1. Instalar dependências (a partir de `web/`):
+   ```
+   npm install
+   ```
+2. Subir o servidor de desenvolvimento (porta fixa **5173**):
+   ```
+   npm run dev
+   ```
+3. Abrir `http://localhost:5173`. Com a API rodando, a tela inicial mostra o estado do sistema (`GET /health`).
+
+**Como a interface encontra a API:** por padrão em `http://localhost:5247` (o `dotnet run`). Para outra URL, copie `web/.env.example` para `web/.env.local` e ajuste `VITE_API_BASE_URL`. A API só aceita requisições do navegador vindas de origens liberadas via CORS — por padrão `http://localhost:5173` e `http://127.0.0.1:5173`; para outras origens, configure `Cors:AllowedOrigins` (lista) na API (ex.: via user-secrets).
+
+**Scripts úteis (em `web/`):**
+
+| Comando | O que faz |
+| --- | --- |
+| `npm run build` | Checagem de tipos + build de produção |
+| `npm run lint` | Lint (`oxlint`) |
+| `npm run format` / `npm run format:check` | Formata / verifica a formatação (Prettier) |
+| `npm test` | Testes (Vitest + React Testing Library) |
+| `npm run api:types` | Regenera os tipos do cliente a partir de `docs/reference/openapi.json` |
+
+O contrato da API (`docs/reference/openapi.json`) é gerado pela própria API; ver [docs/reference/README.md](../reference/README.md) para regenerá-lo depois de mudar um endpoint. Convenções de código da interface: [web-frontend-conventions.md](./web-frontend-conventions.md).
