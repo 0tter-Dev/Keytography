@@ -28,7 +28,7 @@ Dado o caráter sensível dos dados que o Keytography armazena (credenciais de c
 
 ## Git e entrega
 
-Use apenas `git` e `gh`, Conventional Commits, e um PR para a branch principal. Declare explicitamente o impacto de SemVer (major/minor/patch/none) em todo PR e justifique qualquer diferença entre `expected_version_impact` e `actual_version_impact`. Nunca faça merge de um PR autorado por um agente.
+Use apenas `git` e `gh`, Conventional Commits, e um PR para a branch principal. Nomeie branches como `<type>/<id>-<slug>` (o `type` vem do plano) e PRs como `<type>: <resumo> (<id>)`; depois do merge, o fechamento remove as branches locais já mergeadas (`git branch -d`). Detalhes em `docs/DEVELOPMENT-GUIDE.md`, seção "Nomes de branches, PRs e planos". Declare explicitamente o impacto de SemVer (major/minor/patch/none) em todo PR e justifique qualquer diferença entre `expected_version_impact` e `actual_version_impact`. Nunca faça merge de um PR autorado por um agente.
 
 ## Regras de segurança
 

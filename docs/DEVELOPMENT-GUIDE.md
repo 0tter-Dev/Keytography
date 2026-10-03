@@ -37,3 +37,22 @@ Mudanças exigem revisão explícita quando:
 - Use Conventional Commits.
 - Declare o impacto de SemVer (major/minor/patch/none) explicitamente em toda descrição de PR.
 - Mantenha mudanças pequenas e revisáveis.
+
+### Nomes de branches, PRs e planos
+
+O `type` do plano (campo do front matter, um tipo de Conventional Commits: `feat`, `fix`, `docs`, `chore`, `refactor`...) descreve o que ele de fato entrega e aparece em tudo que nasce dele:
+
+| Artefato | Padrão | Exemplo |
+| --- | --- | --- |
+| Arquivo do plano | `<id>-<slug>.md` (o `type` fica no front matter) | `keytography-008-web-authentication-ui.md` |
+| Branch de entrega | `<type>/<id>-<slug>` | `feat/keytography-008-web-authentication-ui` |
+| Título do PR de entrega | `<type>: <resumo> (<id>)` | `feat: web authentication UI (keytography-008)` |
+| Branch e PR de fechamento | `chore/close-<id>` / `chore: close <id> (<resumo>)` | `chore/close-keytography-008` |
+| Trabalho sem plano | `<type>/<slug>` | `docs/branch-and-pr-naming-convention` |
+
+- Se o plano mistura tipos, vale o dominante (a fundação da interface web, que também tocou a API e o CI, foi `feat`). Os commits dentro da branch usam o tipo que couber a cada um; ajustes da `project-audit` entram na mesma branch e no mesmo PR.
+- Este é o padrão deste projeto e pode ser revisto aqui, com aprovação, sem mexer nas skills: elas apenas mandam seguir o que este guia define.
+
+### Limpeza depois do merge
+
+Depois que o PR de entrega é mergeado (nunca antes), o fechamento sincroniza a `main`, roda `git fetch --prune` e apaga as branches locais cujo remoto já foi removido, **somente com `git branch -d`**, que recusa apagar o que não foi mergeado. Se alguma recusar, ela é mantida e o motivo é reportado; `git branch -D` só com autorização explícita. Os remotos são apagados pelo GitHub ao mergear.
