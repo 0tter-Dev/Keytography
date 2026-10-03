@@ -56,3 +56,16 @@ O `type` do plano (campo do front matter, um tipo de Conventional Commits: `feat
 ### Limpeza depois do merge
 
 Depois que o PR de entrega é mergeado (nunca antes), o fechamento sincroniza a `main`, roda `git fetch --prune` e apaga as branches locais cujo remoto já foi removido, **somente com `git branch -d`**, que recusa apagar o que não foi mergeado. Se alguma recusar, ela é mantida e o motivo é reportado; `git branch -D` só com autorização explícita. Os remotos são apagados pelo GitHub ao mergear.
+
+## Hooks do Claude Code (somente neste projeto)
+
+`.claude/settings.json` (versionado) registra hooks que valem para qualquer agente que trabalhe neste repositório; os scripts ficam em `.claude/hooks/` (Node, sem dependências) e são testados com `node --test ".claude/hooks/*.test.mjs"`. Preferências pessoais ficam em `.claude/settings.local.json`, que não é versionado.
+
+| Hook | Quando | O que faz |
+| --- | --- | --- |
+| `block-process-kill-by-name` | antes de comandos de shell | bloqueia encerrar processos pelo nome da imagem (`taskkill /IM`, `pkill`/`killall`, `Stop-Process -Name`, `Get-Process <nome>` encadeado em `Stop-Process`), que derrubam processos alheios ao projeto; a mensagem ensina a parar pela porta ou pelo PID. Texto que só menciona esses comandos (mensagem de commit, heredoc, aspas) não é bloqueado |
+| `web-precommit-checks` | antes de `git commit` com alterações em `web/` | roda `npm run lint` e `npm run format:check` (as mesmas verificações do job `web` do CI) e bloqueia o commit se falharem |
+| `remind-api-contract` | depois de editar endpoints, DTOs, `Program.cs` ou `OpenApi/` da API | lembra de regenerar `docs/reference/openapi.json` e `web/src/api/schema.d.ts` ([ADR-0004](./decisions/ADR-0004-versioned-openapi-contract.md)); só avisa, não bloqueia |
+
+Os hooks são guardas de conveniência e não substituem o CI, que continua sendo a barreira que vale. Um hook com defeito nunca trava o trabalho (entrada ilegível significa "sem opinião"). Alterar ou acrescentar hooks é mudança de governança e passa por PR revisado.
+
