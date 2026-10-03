@@ -1,10 +1,10 @@
 ---
 id: keytography-007
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: high
 sequence: 7
 depends_on: [keytography-006]
@@ -99,3 +99,11 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome
+
+Entregue via [PR #15](https://github.com/0tter-Dev/Keytography/pull/15), mergeada em `main` (squash) no commit `0cebc0b` em 2026-10-03. Commits da branch: `397fc52` (CORS e contrato OpenAPI para o cliente web), `aab6f4e` (fundação da interface web: React + TypeScript + Vite, temas, i18n, casca de layout, cliente tipado, CI) e `4710e9d` (ajustes da `project-audit`). O CI passou no PR (jobs `build` e `web`) e na `main` após o merge.
+
+Auditado via `project-audit` como gate pré-merge. Os achados foram corrigidos no mesmo PR, com aprovação do usuário: campos numéricos do OpenAPI como `number | string` (corrigido por `NumericSchemaTransformer` e teste de regressão), destaque com contraste abaixo de 3:1 como traço sobre fundos claros (token `--accent-ink` e guarda `contrast.test.ts`), formalização do contrato versionado em [ADR-0004](../../decisions/ADR-0004-versioned-openapi-contract.md), e o `README.md` da raiz desatualizado (atualizado, com a regra de manutenção explicitada em `AGENTS.md`, `DEVELOPMENT-GUIDE.md`, `DOCUMENTATION-GUIDE.md` e `docs/plans/README.md`).
+
+Validação final: `dotnet test` com 37/37 testes passando (Release); no `web/`, 68/68 testes do Vitest, `npm run lint`, `npm run format:check`, `npm run build` e `npm run api:types` (sem diferença em `schema.d.ts`) limpos. Conferência visual no navegador: layout mobile e desktop, drawer, temas claro e escuro, e `accent-ink` com pior contraste medido de 3.41:1 contra fundo e superfície (WCAG 1.4.11 exige 3:1). Pendências conhecidas e registradas nas docs: bordas de campos de formulário nos temas comuns abaixo de 3:1 (passada de acessibilidade de `keytography-014`) e bundle JS de cerca de 518 kB sem divisão por rota (a avaliar em `keytography-014`). A CLI do shadcn não foi exercitada com o `components.json` escrito à mão.
+
+`actual_version_impact: minor` — coerente com `expected_version_impact`, sem divergência a justificar (novos recursos aditivos: projeto `web/`, CORS e documento OpenAPI; nenhum comportamento existente da API mudou).
