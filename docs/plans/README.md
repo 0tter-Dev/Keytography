@@ -32,4 +32,4 @@ Todo corpo de plano deve conter `Objective`, `Context`, `Scope`, `Out Of Scope`,
 
 ## Delivery Semantics
 
-Um plano ativo aprovado pelo usuário autoriza a sequência de entrega documentada: branch, implementação, validação, Conventional Commit, push, e pull request. Ele vira `review` naquele PR, e `completed` só depois do merge.
+Um plano ativo aprovado pelo usuário autoriza a sequência de entrega documentada: branch, implementação, validação, Conventional Commit, push, e pull request. Ele vira `review` naquele PR, e `completed` só depois do merge. A branch segue `<type>/<id>-<slug>` com o `type` do plano; o fechamento (`chore/close-<id>`) também apaga as branches locais já mergeadas, depois do merge real (ver [DEVELOPMENT-GUIDE.md](../DEVELOPMENT-GUIDE.md#nomes-de-branches-prs-e-planos)).
