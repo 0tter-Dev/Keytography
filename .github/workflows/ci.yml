@@ -64,3 +64,7 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Claude Code hook tests
+        working-directory: .
+        run: node --test ".claude/hooks/*.test.mjs"
