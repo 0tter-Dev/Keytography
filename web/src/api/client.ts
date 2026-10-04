@@ -5,6 +5,21 @@ import type { paths } from './schema'
 /** URL base da API; padrão = `dotnet run` local (ver web/.env.example). */
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5247'
 
+/** Endpoints anônimos: nunca levam o JWT, para que um 401 deles não possa derrubar a sessão. */
+const PUBLIC_PATHS = [
+  '/health',
+  '/auth/register',
+  '/auth/verify-email',
+  '/auth/login',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+]
+
+function isPublic(request: Request): boolean {
+  const { pathname } = new URL(request.url)
+  return PUBLIC_PATHS.some((path) => pathname.endsWith(path))
+}
+
 /**
  * Anexa o JWT da sessão às chamadas e encerra a sessão quando a API responde 401 a uma chamada
  * feita com o token atual (expirado ou inválido). As rotas protegidas redirecionam ao login.
@@ -12,7 +27,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localho
 const sessionMiddleware: Middleware = {
   onRequest({ request }) {
     const session = useSessionStore.getState()
-    if (isSessionActive(session)) {
+    if (isSessionActive(session) && !isPublic(request)) {
       request.headers.set('Authorization', `Bearer ${session.token}`)
     }
     return request

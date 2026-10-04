@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter, type RouteObject } from 'react-router'
 import { vi } from 'vitest'
+import { SessionController } from '@/features/auth/SessionController'
 import { useSessionStore } from '@/features/auth/session-store'
 
 /** Renderiza rotas num roteador em memória, com TanStack Query, a partir de `route`. */
@@ -10,6 +11,7 @@ export function renderRoutes(routes: RouteObject[], route = '/') {
   const router = createMemoryRouter(routes, { initialEntries: [route] })
   const view = render(
     <QueryClientProvider client={client}>
+      <SessionController />
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )

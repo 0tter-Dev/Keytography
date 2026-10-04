@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import { Toaster } from '@/components/ui/sonner'
+import { SessionController } from '@/features/auth/SessionController'
 import { AppearanceController } from '@/features/theme/AppearanceController'
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AppearanceController />
+      <SessionController />
       {children}
       <Toaster />
     </QueryClientProvider>

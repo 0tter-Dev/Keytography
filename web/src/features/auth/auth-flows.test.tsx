@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { routes } from '@/app/routes'
 import ptBR from '@/i18n/locales/pt-BR.json'
 import { renderRoutes, signInForTest, stubApi } from '@/test/render'
+import { RequireAuth } from './guards'
 import { useSessionStore } from './session-store'
 
 const { auth } = ptBR
@@ -73,13 +74,15 @@ describe('rotas protegidas e sessão', () => {
   it('logout limpa a sessão local e torna as rotas protegidas inacessíveis', async () => {
     signInForTest()
     stubApi({ ...HEALTH, 'GET /auth/me': { body: ME } })
-    const { router } = renderRoutes(routes, '/')
+    const { router, client } = renderRoutes(routes, '/')
     await screen.findByText('ana')
+    expect(client.getQueryData(['me', 'jwt-de-teste'])).toBeDefined()
 
     await userEvent.click(screen.getByRole('button', { name: ptBR.nav.logout }))
 
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
     expect(useSessionStore.getState().token).toBeNull()
+    expect(client.getQueryData(['me', 'jwt-de-teste'])).toBeUndefined()
     expect(sessionStorage.getItem('keytography.session')).not.toContain('jwt-de-teste')
     expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
 
@@ -112,6 +115,27 @@ describe('LoginPage', () => {
         'Bearer jwt-novo',
       ),
     )
+  })
+
+  it('depois de entrar, volta ao destino protegido que o usuário tentou abrir', async () => {
+    stubApi({
+      ...HEALTH,
+      'POST /auth/login': { body: { token: 'jwt-novo', expiresAt: inOneHour() } },
+      'GET /auth/me': { body: ME },
+    })
+    const withVault = [
+      ...routes,
+      { element: <RequireAuth />, children: [{ path: '/vault', element: <p>tela do cofre</p> }] },
+    ]
+    renderRoutes(withVault, '/vault?aba=lixeira')
+    await screen.findByRole('heading', { name: auth.login.title })
+
+    await fill(auth.fields.login, 'ana')
+    await fill(auth.fields.password, 'senha-forte-123')
+    await userEvent.click(screen.getByRole('button', { name: auth.login.submit }))
+
+    expect(await screen.findByText('tela do cofre')).toBeInTheDocument()
+    expect(screen.queryByText(ptBR.health.title)).not.toBeInTheDocument()
   })
 
   it('o redirecionamento ao login guarda o destino original', async () => {
@@ -283,6 +307,23 @@ describe('ForgotPasswordPage', () => {
       'href',
       '/reset-password',
     )
+  })
+
+  it('um novo envio que falha não mantém o aviso de sucesso do envio anterior', async () => {
+    let attempt = 0
+    stubApi({
+      'POST /auth/forgot-password': () =>
+        ++attempt === 1 ? { body: { message: 'x' } } : { status: 500 },
+    })
+    renderRoutes(routes, '/forgot-password')
+    await fill(auth.fields.email, 'ana@example.com')
+    await userEvent.click(screen.getByRole('button', { name: auth.forgotPassword.submit }))
+    expect(await screen.findByText(auth.forgotPassword.sent)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: auth.forgotPassword.submit }))
+
+    expect(await screen.findByText(auth.errors.unknown)).toBeInTheDocument()
+    expect(screen.queryByText(auth.forgotPassword.sent)).not.toBeInTheDocument()
   })
 
   it('valida o e-mail no cliente', async () => {

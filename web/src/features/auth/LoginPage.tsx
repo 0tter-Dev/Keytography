@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { login, type AuthFailure } from './auth-api'
 import { loginSchema } from './auth-schemas'
 import { AuthError } from './AuthError'
-import type { LoginRedirectState } from './guards'
+import { loginRedirectTarget } from './redirect'
 import { useSessionStore } from './session-store'
 
 type LoginValues = { login: string; password: string }
@@ -38,8 +38,7 @@ export function LoginPage() {
       return
     }
     signIn(result.data.token, result.data.expiresAt)
-    const from = (location.state as LoginRedirectState | null)?.from
-    navigate(from ?? '/', { replace: true })
+    navigate(loginRedirectTarget(location.state), { replace: true })
   }
 
   return (

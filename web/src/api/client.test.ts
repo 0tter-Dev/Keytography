@@ -25,6 +25,31 @@ describe('middleware de sessão do cliente da API', () => {
     expect(calls[0]?.headers.has('Authorization')).toBe(false)
   })
 
+  it('não envia o JWT a endpoints anônimos, nem com sessão ativa', async () => {
+    signInForTest('meu-jwt')
+    const { calls } = stubApi({
+      'POST /auth/login': { body: {} },
+      'POST /auth/forgot-password': { body: {} },
+      'GET /health': { body: {} },
+    })
+
+    await api.POST('/auth/login', { body: { login: 'a', password: 'b' } })
+    await api.POST('/auth/forgot-password', { body: { email: 'a@b' } })
+    await api.GET('/health')
+
+    expect(calls).toHaveLength(3)
+    expect(calls.every((call) => !call.headers.has('Authorization'))).toBe(true)
+  })
+
+  it('um 401 de endpoint anônimo não derruba a sessão ativa', async () => {
+    signInForTest('meu-jwt')
+    stubApi({ 'POST /auth/login': { status: 401 } })
+
+    await api.POST('/auth/login', { body: { login: 'a', password: 'b' } })
+
+    expect(useSessionStore.getState().token).toBe('meu-jwt')
+  })
+
   it('encerra a sessão (como expirada) quando a API responde 401 ao token atual', async () => {
     signInForTest('meu-jwt')
     stubApi({ 'GET /auth/me': { status: 401 } })

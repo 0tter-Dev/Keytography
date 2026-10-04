@@ -27,6 +27,7 @@ export function ForgotPasswordPage() {
 
   async function onSubmit(values: ForgotPasswordValues) {
     setFailure(null)
+    setSent(false)
     const result = await forgotPassword(values)
     if (!result.ok) {
       setFailure(result.failure)

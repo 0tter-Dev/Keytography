@@ -1,11 +1,10 @@
 import { useEffect } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
+import { loginRedirectTarget, type LoginRedirectState } from './redirect'
 import { isSessionActive, useSessionStore } from './session-store'
 
 /** Maior atraso que `setTimeout` aceita (~24,8 dias). */
 const MAX_TIMEOUT_MS = 2 ** 31 - 1
-
-export type LoginRedirectState = { from?: string }
 
 /** Rotas que exigem sessão válida; sem ela, redireciona ao login guardando o destino. */
 export function RequireAuth() {
@@ -35,6 +34,13 @@ export function RequireAuth() {
 export function GuestOnly() {
   const token = useSessionStore((state) => state.token)
   const expiresAt = useSessionStore((state) => state.expiresAt)
+  const location = useLocation()
 
-  return isSessionActive({ token, expiresAt }) ? <Navigate to="/" replace /> : <Outlet />
+  // Ao entrar, este guarda reage ao `signIn` antes de qualquer `navigate` do login: é ele que
+  // precisa levar ao destino guardado, senão o usuário sempre cairia no início.
+  return isSessionActive({ token, expiresAt }) ? (
+    <Navigate to={loginRedirectTarget(location.state)} replace />
+  ) : (
+    <Outlet />
+  )
 }

@@ -30,6 +30,7 @@ Nenhum item aberto no momento. `keytography-015` (verificação automática de g
 
 Ideias discutidas durante o planejamento da interface web, deliberadamente fora do escopo atual — ver [web-interface](./capabilities/web-interface/README.md#future-considerations) e [vault-entries](./capabilities/vault-entries/README.md) para o detalhe de cada uma:
 
+- Sessões gerenciadas pelo backend (persistidas no banco, com validação nos endpoints, refresh, logout e revogação) — direção desejada pelo usuário; exige plano próprio e reavaliar o cache da DEK. Ver [ADR-0005](./decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md).
 - Mobile e Desktop (via .NET MAUI) — só começam após a consolidação da interface web.
 - i18n (`en`, `es`) — após a consolidação da interface web, antes de Mobile/Desktop.
 - Configurações de conta completas (nome de exibição editável, upload de imagem real).

@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -17,14 +16,12 @@ type UserMenuProps = {
 export function UserMenu({ collapsed = false, onNavigate }: UserMenuProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const signOut = useSessionStore((state) => state.signOut)
   const { data: user } = useCurrentUser()
 
   function logout() {
+    // O cache de consultas é limpo pelo `SessionController`, em qualquer fim de sessão.
     signOut()
-    // Nada do usuário anterior pode sobrar em cache para a próxima sessão.
-    queryClient.clear()
     onNavigate?.()
     navigate('/login', { replace: true })
   }

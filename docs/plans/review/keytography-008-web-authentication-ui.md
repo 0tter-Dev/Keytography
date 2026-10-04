@@ -10,7 +10,8 @@ sequence: 8
 depends_on: [keytography-007]
 authorized_capabilities:
   - docs/capabilities/web-interface/README.md
-decision_records: []
+decision_records:
+  - docs/decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md
 validation: []
 documentation_updates: []
 ---
@@ -47,13 +48,22 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 
 **Esclarecimentos de implementação (2026-10-03)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite:
 
-- **Armazenamento do JWT: `sessionStorage`** (e não `localStorage`). O token some ao fechar a aba/janela; para um cofre de senhas, preferimos reduzir a janela de exposição a poupar um novo login. O JWT dura 1 hora e a API não tem refresh token, então o ganho de persistir entre sessões do navegador seria pequeno. Contrapartida: abrir o Keytography em outra aba exige novo login.
+- **Armazenamento do JWT: `sessionStorage`** (e não `localStorage`; decisão formalizada no [ADR-0005](../../decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md)). O token some ao fechar a aba/janela; para um cofre de senhas, preferimos reduzir a janela de exposição a poupar um novo login. O JWT dura 1 hora e a API não tem refresh token, então o ganho de persistir entre sessões do navegador seria pequeno. Contrapartida: abrir o Keytography em outra aba exige novo login.
 - **Expiração**: a sessão é encerrada (a) ao reidratar, se o `expiresAt` já passou; (b) por um temporizador no instante do vencimento; e (c) quando a API responde 401 a uma chamada feita com o token atual (middleware do cliente tipado). Nos três casos as rotas protegidas redirecionam ao login, que avisa "sessão expirou" quando o motivo foi expiração.
 - **Logout é só local**: não existe endpoint de logout na API, então sair limpa o token e o cache de consultas no navegador; a cópia da DEK em memória no servidor (ADR-0002) segue até o fim do tempo de vida do JWT. Não é alterado aqui (mudaria a API).
 - **Campo "Confirmar senha"** no registro e na redefinição (não estava no `Scope`): evita uma senha digitada errada trancar o cofre do usuário; é só validação de cliente e não muda o contrato da API.
 - **Telas de verificação e redefinição** (`/verify-email`, `/reset-password`) funcionam com ou sem sessão; login, registro e "esqueci a senha" redirecionam para o início quem já está logado.
 - **Dependências**: entram `react-hook-form`, `zod` e `@hookform/resolvers`, conforme a tabela de [web-frontend-conventions.md](../../guides/web-frontend-conventions.md).
 - **E-mail em desenvolvimento**: a API não envia e-mail de verdade (`LoggingEmailSender`); os tokens de verificação e de redefinição aparecem no log da API, e o usuário os cola nas telas.
+
+**Ajustes após a `project-audit` (2026-10-03), aprovados pelo usuário:**
+
+- **I-1:** o destino guardado ao redirecionar para o login agora é restaurado de fato (`GuestOnly` reage ao `signIn` antes do `navigate` do login; ambos usam `loginRedirectTarget`, que só aceita caminhos internos). Teste com uma segunda rota protegida.
+- **M-1:** em "esqueci minha senha", um novo envio limpa o aviso de sucesso do anterior.
+- **M-2:** o cache de consultas é esvaziado em qualquer fim de sessão (logout, expiração por temporizador ou 401, troca de login) por um `SessionController`, e não só no logout.
+- **M-3:** o JWT não é anexado a endpoints anônimos, e o 401 deles não encerra a sessão.
+- **M-4:** texto residual deste plano corrigido (link do ROADMAP aponta para `review/`).
+- **[ADR-0005](../../decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md):** registra o modelo de sessão atual e a direção desejada. O usuário preferiria sessões **gerenciadas e persistidas pelo backend** (validação nos endpoints, refresh, logout e revogação). Isso **não cabe neste plano**: muda o contrato público e o banco, altera o fluxo de autenticação do backend, exige reavaliar o [ADR-0002](../../decisions/ADR-0002-dek-session-cache.md) (um refresh sem senha não reconstrói a DEK) e foge de `authorized_capabilities`. Ficou documentado como evolução futura (ADR-0005, `ROADMAP.md` e a capability `web-interface`), para um plano próprio com aprovação humana.
 
 ## Acceptance Criteria
 
@@ -76,7 +86,8 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 - `docs/capabilities/web-interface/README.md`: documentar as telas de autenticação implementadas e a estratégia de sessão/rotas protegidas (atualizado).
 - `README.md` (raiz): Current Scope passa a listar autenticação (registro, verificação de e-mail, login e redefinição de senha) como entregue na interface web; Quick Start descreve o que a interface passa a exigir (login) em vez da tela de estado do sistema.
 - `docs/STATUS.md`: refletir o novo status (atualizado).
-- `docs/ROADMAP.md`: link do plano aponta para `active/` (atualizado).
+- `docs/ROADMAP.md`: link do plano aponta para `review/` (atualizado); "Evolução futura" ganha as sessões gerenciadas pelo backend.
+- `docs/decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md` (novo) e `docs/decisions/README.md`: registram o modelo de sessão do cliente e a direção desejada de sessões no backend.
 - `docs/guides/web-frontend-conventions.md`: tabela de dependências (React Hook Form + Zod passam a existir), convenção de formulários e de armazenamento da sessão (atualizado).
 - `docs/guides/running-locally.md`: passos do primeiro acesso (registrar, pegar o token no log da API, verificar, entrar) (atualizado).
 - `docs/reference/` (contrato OpenAPI) e `web/src/api/schema.d.ts`: constatação deliberada de que **não** mudam — nenhum endpoint, DTO ou metadado de resposta foi alterado.
