@@ -17,7 +17,7 @@ A interface web (`keytography-008`) precisou decidir onde o cliente guarda o tok
 
 **Direção desejada (ainda não implementada):** sessões **gerenciadas e controladas pelo backend, persistidas no banco**, com validação do estado da sessão nos endpoints, refresh de token e logout/revogação reais (inclusive de todas as sessões do usuário). Isso resolve as limitações acima: "Sair" passaria a invalidar de fato a sessão e a remover a DEK do cache; o token de acesso poderia ser de vida curta com refresh controlado; e a política de onde o cliente guarda o token poderia ser revista (por exemplo, cookie `HttpOnly` para o refresh).
 
-Esta direção **não faz parte da entrega que originou este ADR** e depende de um plano próprio com aprovação humana explícita, porque:
+Esta direção **não faz parte da entrega que originou este ADR**: está planejada em `keytography-016` (backend) e `keytography-017` (interface web), ainda em `backlog` e dependentes de aprovação humana. Ela depende de um plano próprio com aprovação humana explícita, porque:
 
 - altera o contrato público da API (novos endpoints e respostas) e o esquema do banco (migration de sessões);
 - altera o fluxo de autenticação e o controle de sessão do backend, o que o `AGENTS.md` classifica como mudança que sempre exige revisão humana;
