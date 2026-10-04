@@ -11,6 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { UserMenu } from '@/features/auth/UserMenu'
 import { DevAppearanceControls } from '@/features/theme/DevAppearanceControls'
 import { cn } from '@/lib/utils'
 import { Emblem, Wordmark } from './Brand'
@@ -49,6 +50,9 @@ export function AppShell() {
             </div>
             <SheetDescription className="sr-only">{t('app.tagline')}</SheetDescription>
             <NavList onNavigate={() => setDrawerOpen(false)} />
+            <div className="mt-auto">
+              <UserMenu onNavigate={() => setDrawerOpen(false)} />
+            </div>
           </SheetContent>
         </Sheet>
         <Wordmark />
@@ -64,15 +68,18 @@ export function AppShell() {
           {collapsed ? <Emblem /> : <Wordmark />}
         </div>
         <NavList collapsed={collapsed} />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="mt-auto self-end"
-          aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
-          onClick={() => setCollapsed((value) => !value)}
-        >
-          {collapsed ? <ChevronsRight /> : <ChevronsLeft />}
-        </Button>
+        <div className="mt-auto flex flex-col gap-2">
+          <UserMenu collapsed={collapsed} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="self-end"
+            aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? <ChevronsRight /> : <ChevronsLeft />}
+          </Button>
+        </div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-8">
