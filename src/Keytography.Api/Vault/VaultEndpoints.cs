@@ -47,7 +47,7 @@ public static class VaultEndpoints
         CancellationToken cancellationToken)
     {
         var userId = claimsPrincipal.GetUserId();
-        var dek = dekCache.Get(userId);
+        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
@@ -122,7 +122,7 @@ public static class VaultEndpoints
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var dek = dekCache.Get(userId);
+        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
@@ -153,7 +153,7 @@ public static class VaultEndpoints
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var dek = dekCache.Get(userId);
+        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
@@ -214,7 +214,7 @@ public static class VaultEndpoints
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var dek = dekCache.Get(userId);
+        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();

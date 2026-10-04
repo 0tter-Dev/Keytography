@@ -12,13 +12,13 @@ public class MemoryDekCache : IDekCache
         _cache = cache;
     }
 
-    private static string Key(Guid userId) => $"dek:{userId}";
+    private static string Key(Guid sessionId) => $"dek:{sessionId}";
 
-    public void Set(Guid userId, byte[] dek, TimeSpan ttl) =>
-        _cache.Set(Key(userId), dek, ttl);
+    public void Set(Guid sessionId, byte[] dek, TimeSpan ttl) =>
+        _cache.Set(Key(sessionId), dek, ttl);
 
-    public byte[]? Get(Guid userId) =>
-        _cache.TryGetValue(Key(userId), out byte[]? dek) ? dek : null;
+    public byte[]? Get(Guid sessionId) =>
+        _cache.TryGetValue(Key(sessionId), out byte[]? dek) ? dek : null;
 
-    public void Remove(Guid userId) => _cache.Remove(Key(userId));
+    public void Remove(Guid sessionId) => _cache.Remove(Key(sessionId));
 }

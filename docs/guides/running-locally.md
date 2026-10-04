@@ -46,6 +46,19 @@ dotnet user-secrets set "Jwt:Audience" "Keytography.Dev"
 
 Sem `Jwt:Key` configurado, a API lança uma exceção clara no startup em vez de subir silenciosamente insegura. Os testes automatizados (`dotnet test`) não precisam disso — usam uma chave de teste fixa via configuração isolada por teste.
 
+## Sessões (`Sessions:*`)
+
+Desde `keytography-016`, o login cria uma sessão no banco: o access token (JWT) é de vida curta e a renovação é feita por um cookie de refresh `HttpOnly` ([ADR-0006](../decisions/ADR-0006-backend-managed-sessions.md)). Os tempos têm padrões e podem ser ajustados por configuração (user-secrets, `appsettings` ou variáveis de ambiente como `Sessions__AccessTokenMinutes`):
+
+| Chave | Padrão | O que controla |
+| --- | --- | --- |
+| `Sessions:AccessTokenMinutes` | 15 | vida do access token (JWT) |
+| `Sessions:IdleHours` | 12 | expiração por inatividade (renovada a cada refresh; também o TTL da DEK em cache) |
+| `Sessions:AbsoluteDays` | 7 | limite absoluto da sessão |
+| `Sessions:RotationGraceSeconds` | 10 | janela em que o refresh token anterior ainda é aceito (requisições simultâneas) |
+
+Valores inválidos fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. O cookie só é enviado pelo navegador para origens liberadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`); com `curl`, use um cookie jar (`-c` e `-b`). Até o `keytography-017`, a interface web ainda não renova o token e volta ao login quando o access token vence.
+
 ## Segredos locais (chave de recuperação do cofre)
 
 O esquema de criptografia do cofre (`keytography-003`, [ADR-0001](../decisions/ADR-0001-vault-encryption-and-recovery.md)) exige um par de chaves RSA-OAEP (mínimo 3072 bits) do sistema. A chave privada nunca é commitada — é configurada via user-secrets como PEM:
@@ -97,7 +110,7 @@ A interface web (`keytography-007` em diante) é um projeto separado em `web/` (
 3. Cole o token na tela **Verificar e-mail** (aberta após o cadastro) e, em seguida, entre com o login e a senha.
 4. Para redefinir a senha, use **Esqueci minha senha**; o token de redefinição também aparece no log da API (vale 1 hora) e vai na tela **Redefinir senha**.
 
-A sessão fica no `sessionStorage` do navegador (some ao fechar a aba) e dura 1 hora.
+A sessão da interface fica no `sessionStorage` do navegador (some ao fechar a aba). Desde `keytography-016` o access token dura 15 minutos e a interface ainda não o renova (até `keytography-017`): passado esse tempo, ela volta ao login.
 
 **Scripts úteis (em `web/`):**
 

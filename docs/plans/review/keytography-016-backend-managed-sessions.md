@@ -1,6 +1,6 @@
 ---
 id: keytography-016
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -14,6 +14,7 @@ authorized_capabilities:
 decision_records:
   - docs/decisions/ADR-0002-dek-session-cache.md
   - docs/decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md
+  - docs/decisions/ADR-0006-backend-managed-sessions.md
 validation: []
 documentation_updates: []
 ---
@@ -46,7 +47,7 @@ Este plano é o lado servidor (API, banco, contrato) e vem **antes** da UI de co
 - **CSRF e CORS dos endpoints que usam cookie** (`refresh`, `logout`): a API passa a permitir credenciais em CORS (origens continuam explícitas em `Cors:AllowedOrigins`), exige que o cabeçalho `Origin` seja uma origem permitida (403 caso contrário) e conta com `SameSite=Strict`.
 - **Configuração** em `Sessions:*`, com padrões propostos (confirmados na aprovação): access token **15 minutos**, expiração por inatividade **12 horas**, expiração absoluta **7 dias**, tolerância de rotação **10 segundos**.
 - **Contrato:** novos endpoints e respostas no OpenAPI (`docs/reference/openapi.json`) e `web/src/api/schema.d.ts` regenerados na mesma entrega (ADR-0004); o comportamento do cookie (que o OpenAPI não descreve) é documentado em `docs/reference/README.md`.
-- **ADR-0006 (novo):** formaliza o modelo de sessão do backend e a DEK atrelada à sessão; marca o ADR-0005 como substituído (a "direção desejada" passa a ser decisão implementada) e registra no ADR-0002 que o cache passa a ser por sessão. Redigido nesta entrega a partir das decisões já confirmadas, e sujeito à aprovação humana na revisão do PR.
+- **[ADR-0006](../../decisions/ADR-0006-backend-managed-sessions.md) (novo):** formaliza o modelo de sessão do backend e a DEK atrelada à sessão; marca o ADR-0005 como substituído (a "direção desejada" passa a ser decisão implementada) e registra no ADR-0002 que o cache passa a ser por sessão. Redigido nesta entrega a partir das decisões já confirmadas, e sujeito à aprovação humana na revisão do PR.
 
 ## Out Of Scope
 
@@ -58,6 +59,18 @@ Este plano é o lado servidor (API, banco, contrato) e vem **antes** da UI de co
 - Mudança de roles ou de regras de acesso do `Admin` (um `Admin` só lê cofres alheios, como hoje).
 
 ## Approval
+
+Aprovado pelo usuário em 2026-10-04, ao pedir explicitamente a ativação e a implementação do próximo plano do `ROADMAP.md` (este plano). As decisões de desenho foram confirmadas pelo usuário em 2026-10-03, antes de o plano ser escrito: a DEK continua só em memória do servidor, atrelada à sessão (sem mudar a criptografia do ADR-0001); o refresh token vai em cookie `HttpOnly`; a entrega é dividida em backend (este plano) e web (`keytography-017`), com este plano antes da UI de cofre. Os tempos padrão propostos (access token de 15 minutos, inatividade de 12 horas, limite absoluto de 7 dias, tolerância de rotação de 10 segundos) foram mantidos ao ativar o plano e são configuráveis em `Sessions:*`.
+
+Este plano toca autenticação, sessão e o ciclo de vida da chave do cofre (`AGENTS.md` exige aprovação humana): o PR deve ser revisado com atenção a esses pontos, e a `project-audit` roda em subagente antes do merge.
+
+**Esclarecimentos de implementação (2026-10-04)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite:
+
+- **Cookie persistente, não de sessão do navegador:** o cookie de refresh tem `Expires` igual à expiração por inatividade da sessão (renovada a cada refresh), para que a sessão do navegador e a do servidor tenham a mesma validade; fechar o navegador não encerra a sessão no servidor (só `logout` ou a expiração).
+- **`Origin` ausente é aceito** nos endpoints que usam o cookie (`refresh` e `logout`): clientes que não são navegador não enviam `Origin` e não sofrem CSRF; um `Origin` presente precisa estar em `Cors:AllowedOrigins` (inclusive `null` é recusado). `SameSite=Strict` complementa.
+- **Datas da sessão como ticks UTC** (inteiros) no SQLite, para permitir limpeza e consultas por data no próprio banco.
+- **Refresh dentro da tolerância** devolve só um novo access token, sem rotacionar o cookie (o navegador já recebeu o novo cookie pela resposta da primeira requisição).
+- **Resposta de `refresh`** reutiliza o DTO `LoginResponse` (`token` e `expiresAt`), e a resposta do login mantém os mesmos campos.
 
 ## Acceptance Criteria
 

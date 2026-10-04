@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Keytography.Tests.TestSupport;
@@ -18,6 +19,10 @@ public class ApiFactory : WebApplicationFactory<Program>, IDisposable
     private readonly RSA _testRecoveryKey = RSA.Create(2048);
 
     public FakeEmailSender EmailSender { get; } = new();
+    public TestTimeProvider Time { get; } = new();
+
+    /// <summary>Preenchido depois que o host sobe (decorator do cache real de DEK).</summary>
+    public RecordingDekCache DekCache { get; private set; } = null!;
     public string ConnectionString => $"Data Source={_dbPath}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -38,6 +43,18 @@ public class ApiFactory : WebApplicationFactory<Program>, IDisposable
         {
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(EmailSender);
+
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Time);
+
+            // Mesmo cache em memoria da aplicacao, mas observavel pelos testes de sessao.
+            services.RemoveAll<IDekCache>();
+            services.AddSingleton<IDekCache>(provider =>
+            {
+                DekCache = new RecordingDekCache(
+                    new Keytography.Infrastructure.MemoryDekCache(provider.GetRequiredService<IMemoryCache>()));
+                return DekCache;
+            });
         });
     }
 

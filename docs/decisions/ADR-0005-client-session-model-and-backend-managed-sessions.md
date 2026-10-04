@@ -1,5 +1,7 @@
 # ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend
 
+> **Status:** a "direção desejada" foi implementada no lado do servidor pelo [ADR-0006](./ADR-0006-backend-managed-sessions.md) (`keytography-016`). O modelo de **cliente** descrito abaixo (JWT em `sessionStorage`, logout local) segue vigente só até o `keytography-017` adaptar a interface web; depois dele, este ADR fica substituído pelo ADR-0006.
+
 ## Context
 
 A API emite um JWT de 1 hora no login (`POST /auth/login`) e não tem refresh token, endpoint de logout nem registro de sessões: a validação é puramente stateless (assinatura e validade do token). Ao mesmo tempo, o servidor guarda a DEK decifrada do usuário em um cache em memória, com expiração igual à do JWT ([ADR-0002](./ADR-0002-dek-session-cache.md)). Quando o JWT vence, o cache vence junto e o usuário precisa informar a senha de novo — é a única forma de reconstruir a DEK, porque o servidor não guarda a senha.

@@ -1,5 +1,7 @@
 # ADR-0002: Cache em memória da DEK por sessão
 
+> **Atualização ([ADR-0006](./ADR-0006-backend-managed-sessions.md), `keytography-016`):** o cache passou a ser indexado pelo **id da sessão** (e não pelo usuário) e o TTL acompanha a expiração por inatividade da sessão, renovado a cada refresh; logout e revogação removem a DEK. O restante desta decisão (DEK só em memória, 401 sem DEK em cache, supervisão do `Admin` sem cache) continua valendo. Onde o texto abaixo diz "por usuário" e "tempo de vida do JWT", leia "por sessão" e "tempo de vida da sessão".
+
 ## Context
 
 `ADR-0001` define que a cópia "do dono" da DEK é decifrada usando uma chave derivada da senha de login via **Argon2id**. Essa derivação é propositalmente lenta — é o que a torna resistente a força bruta — e não existe hoje nenhum mecanismo de "master password" separada: a senha de login é a única credencial que o usuário fornece.

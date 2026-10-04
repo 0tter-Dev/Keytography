@@ -32,7 +32,7 @@ Abre em `http://localhost:5173`, na tela de login. Hoje a interface entrega a fu
 
 **Core/backend — implementado:**
 
-- Autenticação de usuários multiusuário (roles `Admin` e `Member`)
+- Autenticação de usuários multiusuário (roles `Admin` e `Member`), com sessões controladas pelo backend: access token curto, refresh rotativo em cookie `HttpOnly`, logout e revogação reais (a interface web passa a usar isso em `keytography-017`)
 - CRUD de contas e senhas com criptografia e histórico
 - Avaliação de força de senha por critérios modulares
 - Geração de senhas fortes com exigência de força mínima

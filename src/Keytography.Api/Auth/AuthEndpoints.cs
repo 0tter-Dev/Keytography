@@ -1,14 +1,11 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using Keytography.Domain;
 using Keytography.Domain.Security;
 using Keytography.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Keytography.Api.Auth;
 
@@ -24,6 +21,9 @@ public static class AuthEndpoints
         group.MapPost("/register", RegisterAsync).Produces<RegisterResponse>(StatusCodes.Status201Created);
         group.MapPost("/verify-email", VerifyEmailAsync).Produces<MessageResponse>();
         group.MapPost("/login", LoginAsync).Produces<LoginResponse>();
+        group.MapPost("/refresh", RefreshAsync).Produces<LoginResponse>();
+        group.MapPost("/logout", LogoutAsync).Produces(StatusCodes.Status204NoContent);
+        group.MapPost("/logout-all", LogoutAllAsync).RequireAuthorization().Produces(StatusCodes.Status204NoContent);
         group.MapPost("/forgot-password", ForgotPasswordAsync).Produces<MessageResponse>();
         group.MapPost("/reset-password", ResetPasswordAsync).Produces<MessageResponse>();
         group.MapGet("/me", GetMeAsync).RequireAuthorization().Produces<MeResponse>();
@@ -132,9 +132,9 @@ public static class AuthEndpoints
 
     private static async Task<IResult> LoginAsync(
         LoginRequest request,
+        HttpContext httpContext,
         KeytographyDbContext db,
-        IConfiguration configuration,
-        IDekCache dekCache,
+        SessionService sessions,
         CancellationToken cancellationToken)
     {
         var login = request.Login?.Trim() ?? string.Empty;
@@ -154,20 +154,98 @@ public static class AuthEndpoints
                 statusCode: StatusCodes.Status403Forbidden);
         }
 
-        var (token, expiresAt) = IssueJwt(user, configuration);
-
         // Desfaz a DEK usando a copia "do dono" (unica vez em que a senha em texto puro
-        // esta disponivel) e mantem em cache pelo tempo de vida do JWT, para as
-        // operacoes de cofre da sessao (ver ADR-0001 e a decisao de cache em memoria).
+        // esta disponivel); ela fica em cache em memoria, atrelada a sessao criada abaixo,
+        // para as operacoes de cofre (ADR-0001, ADR-0002 e ADR-0006).
+        byte[]? dek = null;
         var vaultKey = await db.VaultKeys.FirstOrDefaultAsync(k => k.UserId == user.Id, cancellationToken);
         if (vaultKey is not null)
         {
             var ownerKey = Argon2IdKdf.DeriveKey(password, vaultKey.Argon2Salt);
-            var dek = AesGcmCipher.Decrypt(ownerKey, vaultKey.OwnerWrappedDek);
-            dekCache.Set(user.Id, dek, expiresAt - DateTimeOffset.UtcNow);
+            dek = AesGcmCipher.Decrypt(ownerKey, vaultKey.OwnerWrappedDek);
         }
 
-        return Results.Ok(new LoginResponse(token, expiresAt));
+        var issued = await sessions.CreateAsync(user, dek, cancellationToken);
+        sessions.WriteRefreshCookie(httpContext, issued.RefreshToken, issued.Session);
+
+        return Results.Ok(new LoginResponse(issued.AccessToken, issued.AccessTokenExpiresAt));
+    }
+
+    /// <summary>
+    /// Renova o access token a partir do cookie de refresh (rotacionando-o). 401 sem revelar o
+    /// motivo (cookie ausente, desconhecido, de sessao revogada/expirada ou reutilizado).
+    /// </summary>
+    private static async Task<IResult> RefreshAsync(
+        HttpContext httpContext,
+        IConfiguration configuration,
+        SessionService sessions,
+        CancellationToken cancellationToken)
+    {
+        if (!AllowedOrigins.IsRequestOriginAllowed(httpContext.Request, configuration))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        httpContext.Request.Cookies.TryGetValue(SessionService.RefreshCookieName, out var refreshToken);
+        var result = await sessions.RefreshAsync(refreshToken, cancellationToken);
+
+        if (result.Outcome is SessionService.RefreshOutcome.Invalid or SessionService.RefreshOutcome.ReuseDetected)
+        {
+            sessions.ClearRefreshCookie(httpContext);
+            return Results.Unauthorized();
+        }
+
+        if (result.Outcome == SessionService.RefreshOutcome.Rotated)
+        {
+            sessions.WriteRefreshCookie(httpContext, result.NewRefreshToken!, result.Session!);
+        }
+
+        var (accessToken, expiresAt) = sessions.IssueAccessToken(result.User!, result.Session!);
+        return Results.Ok(new LoginResponse(accessToken, expiresAt));
+    }
+
+    /// <summary>
+    /// Encerra a sessao atual (identificada pelo cookie de refresh ou, sem ele, pelo access
+    /// token): revoga, remove a DEK dela do cache e apaga o cookie. Idempotente (204 sempre).
+    /// </summary>
+    private static async Task<IResult> LogoutAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal principal,
+        IConfiguration configuration,
+        SessionService sessions,
+        CancellationToken cancellationToken)
+    {
+        if (!AllowedOrigins.IsRequestOriginAllowed(httpContext.Request, configuration))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        httpContext.Request.Cookies.TryGetValue(SessionService.RefreshCookieName, out var refreshToken);
+        var session = await sessions.FindByRefreshTokenAsync(refreshToken, cancellationToken);
+        if (session is null && principal.TryGetSessionId(out var sessionId))
+        {
+            session = await sessions.FindByIdAsync(sessionId, cancellationToken);
+        }
+
+        if (session is not null)
+        {
+            await sessions.RevokeAsync(session, SessionRevocationReason.Logout, cancellationToken);
+        }
+
+        sessions.ClearRefreshCookie(httpContext);
+        return Results.NoContent();
+    }
+
+    /// <summary>Encerra todas as sessoes do usuario autenticado ("sair de todos os dispositivos").</summary>
+    private static async Task<IResult> LogoutAllAsync(
+        HttpContext httpContext,
+        ClaimsPrincipal principal,
+        SessionService sessions,
+        CancellationToken cancellationToken)
+    {
+        await sessions.RevokeAllAsync(principal.GetUserId(), SessionRevocationReason.LogoutAll, cancellationToken);
+        sessions.ClearRefreshCookie(httpContext);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> ForgotPasswordAsync(
@@ -200,6 +278,7 @@ public static class AuthEndpoints
         ResetPasswordRequest request,
         KeytographyDbContext db,
         IRecoveryKeyProvider recoveryKeyProvider,
+        SessionService sessions,
         CancellationToken cancellationToken)
     {
         var newPassword = request.NewPassword ?? string.Empty;
@@ -242,6 +321,9 @@ public static class AuthEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // A credencial mudou: nenhuma sessao aberta com a senha antiga continua valendo.
+        await sessions.RevokeAllAsync(user.Id, SessionRevocationReason.PasswordReset, cancellationToken);
+
         return Results.Ok(new MessageResponse("Senha redefinida com sucesso."));
     }
 
@@ -264,34 +346,5 @@ public static class AuthEndpoints
             Token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
             ExpiresAt = DateTimeOffset.UtcNow.AddHours(lifetimeHours)
         };
-    }
-
-    private static (string Token, DateTimeOffset ExpiresAt) IssueJwt(User user, IConfiguration configuration)
-    {
-        var key = configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException("Jwt:Key não configurado. Veja docs/guides/running-locally.md.");
-        var issuer = configuration["Jwt:Issuer"] ?? "Keytography";
-        var audience = configuration["Jwt:Audience"] ?? "Keytography";
-        var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
-
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim("login", user.Login),
-            new Claim(ClaimTypes.Role, user.Role.ToString())
-        };
-
-        var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
-            SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: claims,
-            expires: expiresAt.UtcDateTime,
-            signingCredentials: credentials);
-
-        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 }

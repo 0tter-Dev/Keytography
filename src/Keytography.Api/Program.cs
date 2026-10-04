@@ -1,3 +1,4 @@
+using Keytography.Api;
 using Keytography.Api.Auth;
 using Keytography.Api.Health;
 using Keytography.Api.OpenApi;
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
 const string WebCorsPolicy = "web";
@@ -39,15 +41,28 @@ builder.Services.AddOpenApi(options => options.AddSchemaTransformer<NumericSchem
 builder.Services.AddCors();
 builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((options, configuration) =>
 {
-    var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-        ?? ["http://localhost:5173", "http://127.0.0.1:5173"];
+    // Credenciais (cookie de refresh) exigem origens explicitas: nunca "qualquer origem".
     options.AddPolicy(WebCorsPolicy, policy => policy
-        .WithOrigins(origins)
+        .WithOrigins(AllowedOrigins.Resolve(configuration))
         .AllowAnyHeader()
-        .AllowAnyMethod());
+        .AllowAnyMethod()
+        .AllowCredentials());
 });
 
 builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+
+builder.Services.AddSingleton(TimeProvider.System);
+
+// Tempos de vida das sessoes (keytography-016); valores invalidos falham no startup.
+builder.Services.AddOptions<SessionLifetimeOptions>()
+    .BindConfiguration(SessionLifetimeOptions.SectionName)
+    .Validate(options =>
+    {
+        options.Validate();
+        return true;
+    })
+    .ValidateOnStart();
+builder.Services.AddScoped<SessionService>();
 
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IDekCache, MemoryDekCache>();
@@ -81,6 +96,25 @@ builder.Services
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+
+        // O JWT so vale enquanto a sessao dele (claim "sid") existir, nao estiver revogada e nao
+        // tiver expirado: revogar (logout, reset de senha, reuso de refresh) vale na hora.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var principal = context.Principal!;
+                var sessions = context.HttpContext.RequestServices.GetRequiredService<SessionService>();
+                var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+                if (!principal.TryGetSessionId(out var sessionId)
+                    || !Guid.TryParse(userIdClaim, out var userId)
+                    || await sessions.FindActiveAsync(sessionId, userId, context.HttpContext.RequestAborted) is null)
+                {
+                    context.Fail("Sessão inválida, revogada ou expirada.");
+                }
+            }
         };
     });
 builder.Services.AddAuthorization();
