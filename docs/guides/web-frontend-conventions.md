@@ -12,11 +12,10 @@ React 19 + TypeScript (modo `strict`) + Vite, Tailwind CSS v4, componentes no es
 
 ### Dependências: só entram no plano que as usa
 
-Não instalamos biblioteca "para o futuro". Cada uma entra no plano cujo código a consome, para evitar conflitos, peso extra e configuração ociosa:
+Não instalamos biblioteca "para o futuro". Cada uma entra no plano cujo código a consome, para evitar conflitos, peso extra e configuração ociosa. React Hook Form + Zod (com `@hookform/resolvers`) entraram em `keytography-008`, com as telas de autenticação; as demais ainda aguardam:
 
 | Biblioteca | Entra em |
 | --- | --- |
-| React Hook Form + Zod (formulários/validação) | `keytography-008` |
 | Motion (animações de transição), `@formkit/auto-animate` (listas), `cmdk` (command palette) | `keytography-014` (ou antes, se um plano anterior realmente precisar) |
 
 ## Estrutura de pastas (`web/src`)
@@ -98,10 +97,23 @@ A preferência é persistida em `localStorage` (`keytography.appearance`); `inde
 - **Mudou um endpoint, DTO ou metadado de resposta na API? Regenerar e commitar o contrato e os tipos na mesma entrega é obrigatório** (procedimento em [docs/reference/README.md](../reference/README.md); decisão em [ADR-0004](../decisions/ADR-0004-versioned-openapi-contract.md)). O teste do backend e o CI do frontend falham se `docs/reference/openapi.json` ou `schema.d.ts` ficarem desatualizados — e um plano que toque a API deve listar o contrato em `Documentation Updates`.
 - Leitura de dados via TanStack Query (cache, loading e erro tratados de forma uniforme).
 
+## Formulários
+
+- React Hook Form + Zod, com `zodResolver`. O schema vive em uma função que recebe `t` (`loginSchema(t)`, em `features/auth/auth-schemas.ts`), para que as mensagens de validação saiam do arquivo de tradução; o formulário o memoiza com `useMemo(() => schema(t), [t])`.
+- O schema **espelha as regras da API** (por exemplo, senha ≥ 8 caracteres), mas a API continua sendo a autoridade: falhas vindas dela são mapeadas por tipo (`AuthFailure`) para um texto traduzido, nunca exibindo a mensagem crua do servidor.
+- Use `FormField` (rótulo + controle + erro ligados por ARIA) com `Input`, e `Alert` para erros do formulário como um todo. Campos de senha usam `autoComplete` correto (`current-password`/`new-password`).
+
+## Sessão e rotas protegidas
+
+- A sessão (JWT + `expiresAt`) vive em `features/auth/session-store.ts`, persistida em **`sessionStorage`** — não em `localStorage` — de propósito: é um cofre de senhas e o token deve sumir com a aba (decisão e direção futura no [ADR-0005](../decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md)). Não guarde o token em outro lugar nem o copie para estado de componente.
+- Quem precisa estar logado fica sob a rota `RequireAuth` (`features/auth/guards.tsx`); telas só para visitantes ficam sob `GuestOnly`. Rotas novas entram em `app/routes.tsx`.
+- Chamadas à API usam sempre o cliente tipado: ele anexa o `Authorization` (menos nos endpoints anônimos, listados em `api/client.ts` — um endpoint anônimo novo entra nessa lista) e trata o 401 (encerra a sessão). Não monte o cabeçalho à mão.
+- Consultas que dependem do usuário incluem o token na `queryKey` (`['me', token]`) e o `SessionController` esvazia o cache do TanStack Query em qualquer fim de sessão (logout, expiração, 401, novo login), para nada de uma sessão vazar para a próxima. Depois do login, `loginRedirectTarget` (`features/auth/redirect.ts`) devolve o destino guardado pelo `RequireAuth`, só se for um caminho interno.
+
 ## Testes
 
 - Vitest + React Testing Library. Consultar elementos **por papel e nome acessível** (`getByRole('button', { name })`), usando os textos do `pt-BR.json` (não duplique strings no teste).
-- Mockar a rede com `vi.stubGlobal('fetch', ...)`; nunca depender de API rodando.
+- Mockar a rede com `vi.stubGlobal('fetch', ...)`; nunca depender de API rodando. Para fluxos com rotas e API, use os auxiliares de `src/test/render.tsx` (`renderRoutes`, `stubApi` por rota, `signInForTest`) e renderize a árvore real de `app/routes.tsx`.
 - Comportamento visual que depende de CSS real (contraste, breakpoints, animações) não roda no jsdom — é verificado manualmente no navegador e registrado no PR.
 
 ## Acessibilidade mínima

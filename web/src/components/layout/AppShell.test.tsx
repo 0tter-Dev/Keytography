@@ -1,20 +1,33 @@
-import { render, screen, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { RouterProvider, createMemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ptBR from '@/i18n/locales/pt-BR.json'
+import { renderRoutes, signInForTest, stubApi } from '@/test/render'
 import { AppShell } from './AppShell'
 
 function renderShell() {
-  const router = createMemoryRouter([
+  return renderRoutes([
     {
       path: '/',
       element: <AppShell />,
       children: [{ index: true, element: <p>conteúdo da página</p> }],
     },
+    { path: '/login', element: <p>tela de login</p> },
   ])
-  return render(<RouterProvider router={router} />)
 }
+
+beforeEach(() => {
+  signInForTest()
+  stubApi({
+    'GET /auth/me': {
+      body: { id: 'u1', login: 'ana', email: 'ana@example.com', role: 'Member' },
+    },
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('AppShell', () => {
   it('renderiza a navegação lateral e o conteúdo da rota', () => {
@@ -49,5 +62,11 @@ describe('AppShell', () => {
     const dialog = await screen.findByRole('dialog')
     await userEvent.click(within(dialog).getByRole('link', { name: ptBR.nav.home }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('mostra o usuário logado na navegação', async () => {
+    renderShell()
+
+    expect(await screen.findByText('ana')).toBeInTheDocument()
   })
 })

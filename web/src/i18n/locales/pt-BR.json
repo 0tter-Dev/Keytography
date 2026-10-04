@@ -12,7 +12,8 @@
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu",
     "collapse": "Recolher menu lateral",
-    "expand": "Expandir menu lateral"
+    "expand": "Expandir menu lateral",
+    "logout": "Sair"
   },
   "health": {
     "title": "Estado do sistema",
@@ -51,6 +52,78 @@
       "orange": "Laranja",
       "yellow": "Amarelo",
       "pink": "Rosa"
+    }
+  },
+  "auth": {
+    "backToLogin": "Voltar para o login",
+    "fields": {
+      "login": "Login",
+      "email": "E-mail",
+      "password": "Senha",
+      "newPassword": "Nova senha",
+      "confirmPassword": "Confirmar senha",
+      "verificationToken": "Token de verificação",
+      "resetToken": "Token de redefinição"
+    },
+    "validation": {
+      "loginRequired": "Informe o login.",
+      "passwordRequired": "Informe a senha.",
+      "emailRequired": "Informe o e-mail.",
+      "emailInvalid": "Informe um e-mail válido.",
+      "passwordMin": "A senha deve ter ao menos {{min}} caracteres.",
+      "passwordMismatch": "As senhas não coincidem.",
+      "tokenRequired": "Informe o token."
+    },
+    "errors": {
+      "invalidCredentials": "Login ou senha incorretos.",
+      "emailNotVerified": "Seu e-mail ainda não foi verificado. Confirme-o antes de entrar.",
+      "conflict": "Login ou e-mail já cadastrado.",
+      "invalidToken": "Token inválido ou expirado. Confira o token ou solicite um novo.",
+      "invalidInput": "Os dados informados não foram aceitos. Revise o formulário.",
+      "network": "Não foi possível falar com o servidor. Tente novamente.",
+      "unknown": "Algo deu errado. Tente novamente."
+    },
+    "login": {
+      "title": "Entrar",
+      "description": "Acesse o seu cofre.",
+      "submit": "Entrar",
+      "submitting": "Entrando…",
+      "forgotPasswordLink": "Esqueci minha senha",
+      "noAccount": "Ainda não tem conta?",
+      "registerLink": "Criar conta",
+      "verifyEmailLink": "Verificar meu e-mail",
+      "sessionExpired": "Sua sessão expirou. Entre novamente."
+    },
+    "register": {
+      "title": "Criar conta",
+      "description": "Crie sua conta para começar a guardar suas chaves.",
+      "submit": "Criar conta",
+      "submitting": "Criando…",
+      "success": "Conta criada. Enviamos um token de verificação para o seu e-mail.",
+      "haveAccount": "Já tem conta?",
+      "loginLink": "Entrar"
+    },
+    "verifyEmail": {
+      "title": "Verificar e-mail",
+      "description": "Informe o token enviado para o seu e-mail para confirmar a conta.",
+      "submit": "Verificar",
+      "submitting": "Verificando…",
+      "success": "E-mail verificado. Agora você já pode entrar."
+    },
+    "forgotPassword": {
+      "title": "Esqueci minha senha",
+      "description": "Informe o e-mail da conta para receber um token de redefinição.",
+      "submit": "Enviar token",
+      "submitting": "Enviando…",
+      "sent": "Se o e-mail estiver cadastrado, enviamos um token de redefinição.",
+      "haveToken": "Já tenho um token"
+    },
+    "resetPassword": {
+      "title": "Redefinir senha",
+      "description": "Informe o token recebido por e-mail e escolha a nova senha.",
+      "submit": "Redefinir senha",
+      "submitting": "Redefinindo…",
+      "success": "Senha redefinida. Entre com a nova senha."
     }
   }
 }
