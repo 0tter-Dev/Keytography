@@ -1,6 +1,6 @@
 ---
 id: keytography-008
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -43,6 +43,18 @@ Implementar as telas de autenticação da interface web — registro, verificaç
 
 ## Approval
 
+Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a implementação do próximo passo do `ROADMAP.md` (este plano). Este plano não altera a API, a criptografia, as regras de autenticação do backend nem o controle de acesso por role: só consome os endpoints existentes. Como toca o **lado cliente** da autenticação (onde o JWT fica guardado), a escolha abaixo é registrada para revisão humana no PR.
+
+**Esclarecimentos de implementação (2026-10-03)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite:
+
+- **Armazenamento do JWT: `sessionStorage`** (e não `localStorage`). O token some ao fechar a aba/janela; para um cofre de senhas, preferimos reduzir a janela de exposição a poupar um novo login. O JWT dura 1 hora e a API não tem refresh token, então o ganho de persistir entre sessões do navegador seria pequeno. Contrapartida: abrir o Keytography em outra aba exige novo login.
+- **Expiração**: a sessão é encerrada (a) ao reidratar, se o `expiresAt` já passou; (b) por um temporizador no instante do vencimento; e (c) quando a API responde 401 a uma chamada feita com o token atual (middleware do cliente tipado). Nos três casos as rotas protegidas redirecionam ao login, que avisa "sessão expirou" quando o motivo foi expiração.
+- **Logout é só local**: não existe endpoint de logout na API, então sair limpa o token e o cache de consultas no navegador; a cópia da DEK em memória no servidor (ADR-0002) segue até o fim do tempo de vida do JWT. Não é alterado aqui (mudaria a API).
+- **Campo "Confirmar senha"** no registro e na redefinição (não estava no `Scope`): evita uma senha digitada errada trancar o cofre do usuário; é só validação de cliente e não muda o contrato da API.
+- **Telas de verificação e redefinição** (`/verify-email`, `/reset-password`) funcionam com ou sem sessão; login, registro e "esqueci a senha" redirecionam para o início quem já está logado.
+- **Dependências**: entram `react-hook-form`, `zod` e `@hookform/resolvers`, conforme a tabela de [web-frontend-conventions.md](../../guides/web-frontend-conventions.md).
+- **E-mail em desenvolvimento**: a API não envia e-mail de verdade (`LoggingEmailSender`); os tokens de verificação e de redefinição aparecem no log da API, e o usuário os cola nas telas.
+
 ## Acceptance Criteria
 
 - Registrar um novo usuário, verificar o e-mail com o token recebido (via tela de verificação), e logar com sucesso — fluxo completo funcional ponta a ponta contra a API real.
@@ -61,8 +73,13 @@ Implementar as telas de autenticação da interface web — registro, verificaç
 
 ## Documentation Updates
 
-- `docs/capabilities/web-interface/README.md`: documentar as telas de autenticação implementadas e a estratégia de sessão/rotas protegidas.
+- `docs/capabilities/web-interface/README.md`: documentar as telas de autenticação implementadas e a estratégia de sessão/rotas protegidas (atualizado).
 - `README.md` (raiz): Current Scope passa a listar autenticação (registro, verificação de e-mail, login e redefinição de senha) como entregue na interface web; Quick Start descreve o que a interface passa a exigir (login) em vez da tela de estado do sistema.
-- `docs/STATUS.md`: refletir o novo status.
+- `docs/STATUS.md`: refletir o novo status (atualizado).
+- `docs/ROADMAP.md`: link do plano aponta para `active/` (atualizado).
+- `docs/guides/web-frontend-conventions.md`: tabela de dependências (React Hook Form + Zod passam a existir), convenção de formulários e de armazenamento da sessão (atualizado).
+- `docs/guides/running-locally.md`: passos do primeiro acesso (registrar, pegar o token no log da API, verificar, entrar) (atualizado).
+- `docs/reference/` (contrato OpenAPI) e `web/src/api/schema.d.ts`: constatação deliberada de que **não** mudam — nenhum endpoint, DTO ou metadado de resposta foi alterado.
+- Capabilities de backend (`authentication-and-users` etc.): constatação deliberada de que não precisam mudar — nenhum comportamento da API mudou (e estão fora de `authorized_capabilities`).
 
 ## Outcome

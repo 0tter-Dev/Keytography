@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Abre em `http://localhost:5173`. Hoje a interface entrega a fundação (layout responsivo, temas, cliente de API tipado) e uma tela com o estado do sistema; as telas de autenticação, cofre, avaliação e geração de senha ainda estão em desenvolvimento — veja [docs/ROADMAP.md](./docs/ROADMAP.md) e [docs/STATUS.md](./docs/STATUS.md).
+Abre em `http://localhost:5173`, na tela de login. Hoje a interface entrega a fundação (layout responsivo, temas, cliente de API tipado) e a autenticação (criar conta, verificar e-mail, entrar, redefinir senha); depois de entrar, a tela inicial ainda mostra só o estado do sistema. Em desenvolvimento a API não envia e-mail: o token de verificação aparece no log do `dotnet run` (passo a passo em [docs/guides/running-locally.md](./docs/guides/running-locally.md#primeiro-acesso-na-interface-web)). As telas de cofre, avaliação e geração de senha ainda estão em desenvolvimento — veja [docs/ROADMAP.md](./docs/ROADMAP.md) e [docs/STATUS.md](./docs/STATUS.md).
 
 ## Current Scope
 
@@ -37,7 +37,7 @@ Abre em `http://localhost:5173`. Hoje a interface entrega a fundação (layout r
 - Avaliação de força de senha por critérios modulares
 - Geração de senhas fortes com exigência de força mínima
 
-**Interface web — em andamento:** fundação entregue (React + TypeScript + Vite, sistema de temas, i18n `pt-BR`, casca de layout responsiva, cliente tipado gerado do contrato da API). As telas funcionais estão planejadas em sequência (`keytography-008` a `014`). Mobile e Desktop só começam depois que a interface web estiver consolidada.
+**Interface web — em andamento:** fundação entregue (React + TypeScript + Vite, sistema de temas, i18n `pt-BR`, casca de layout responsiva, cliente tipado gerado do contrato da API) e autenticação (registro, verificação de e-mail, login, redefinição de senha, sessão e rotas protegidas, logout). As demais telas estão planejadas em sequência (`keytography-009` a `014`). Mobile e Desktop só começam depois que a interface web estiver consolidada.
 
 Out of scope for now: sincronização em nuvem, compartilhamento de senhas entre usuários, 2FA/TOTP embutido, extensão de navegador.
 
@@ -48,7 +48,7 @@ Para documentação completa, comece por [Start Here](./docs/START-HERE.md). O c
 ## Stack
 
 - **Backend:** C# / ASP.NET Core (.NET 10), Entity Framework Core + SQLite.
-- **Frontend web:** React + TypeScript + Vite, Tailwind CSS, com cliente de API tipado gerado do contrato OpenAPI versionado.
+- **Frontend web:** React + TypeScript + Vite, Tailwind CSS, React Hook Form + Zod (formulários), com cliente de API tipado gerado do contrato OpenAPI versionado.
 
 Ver [Selected Technology Direction](./docs/PROJECT-ARCHITECTURE.md#selected-technology-direction) para o detalhe e o raciocínio de cada escolha.
 

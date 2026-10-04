@@ -10,7 +10,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | UI de autenticação | [keytography-008](./plans/backlog/keytography-008-web-authentication-ui.md) — depende de keytography-007 |
+| medium | UI de autenticação | [keytography-008](./plans/review/keytography-008-web-authentication-ui.md) — depende de keytography-007; em revisão (PR aberto) |
 | medium | UI de cofre (CRUD núcleo) | [keytography-009](./plans/backlog/keytography-009-web-vault-entries-ui.md) — depende de keytography-008 |
 | medium | UI de avaliação de força | [keytography-010](./plans/backlog/keytography-010-web-password-evaluation-ui.md) — depende de keytography-009 |
 | medium | UI de geração de senha | [keytography-011](./plans/backlog/keytography-011-web-password-generation-ui.md) — depende de keytography-009 |
@@ -18,7 +18,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 | medium | UI de supervisão do Admin (mínima) | [keytography-013](./plans/backlog/keytography-013-web-admin-supervision-ui.md) — depende de keytography-008, keytography-009 |
 | medium | Polimento visual, responsividade e interação | [keytography-014](./plans/backlog/keytography-014-web-visual-polish-and-interactions.md) — depende de keytography-010, 011, 012, 013 |
 
-`keytography-007` foi concluído em 2026-10-03. Os planos acima permanecem em `backlog` — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-007` foi concluído em 2026-10-03 e `keytography-008` está em revisão. Os demais planos acima permanecem em `backlog` — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
 
 ## Processo e governança
 

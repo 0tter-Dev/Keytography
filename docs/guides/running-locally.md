@@ -86,9 +86,18 @@ A interface web (`keytography-007` em diante) é um projeto separado em `web/` (
    ```
    npm run dev
    ```
-3. Abrir `http://localhost:5173`. Com a API rodando, a tela inicial mostra o estado do sistema (`GET /health`).
+3. Abrir `http://localhost:5173`. Sem sessão, a interface mostra o login (ver [Primeiro acesso](#primeiro-acesso-na-interface-web)); depois de entrar, a tela inicial mostra o estado do sistema (`GET /health`).
 
 **Como a interface encontra a API:** por padrão em `http://localhost:5247` (o `dotnet run`). Para outra URL, copie `web/.env.example` para `web/.env.local` e ajuste `VITE_API_BASE_URL`. A API só aceita requisições do navegador vindas de origens liberadas via CORS — por padrão `http://localhost:5173` e `http://127.0.0.1:5173`; para outras origens, configure `Cors:AllowedOrigins` (lista) na API (ex.: via user-secrets).
+
+### Primeiro acesso na interface web
+
+1. Abra `http://localhost:5173`: sem sessão, a interface leva ao login. Clique em **Criar conta** e preencha o formulário (o primeiro usuário cadastrado vira `Admin`).
+2. A API não envia e-mail de verdade em desenvolvimento: o token de verificação aparece no **log do `dotnet run`**, em uma linha como `E-mail (dev, nao enviado de verdade) para ... | Corpo: Use o token a seguir para confirmar seu e-mail: <TOKEN>`.
+3. Cole o token na tela **Verificar e-mail** (aberta após o cadastro) e, em seguida, entre com o login e a senha.
+4. Para redefinir a senha, use **Esqueci minha senha**; o token de redefinição também aparece no log da API (vale 1 hora) e vai na tela **Redefinir senha**.
+
+A sessão fica no `sessionStorage` do navegador (some ao fechar a aba) e dura 1 hora.
 
 **Scripts úteis (em `web/`):**
 
