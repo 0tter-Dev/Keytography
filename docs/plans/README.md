@@ -40,9 +40,9 @@ Um plano ativo aprovado pelo usuário autoriza a sequência de entrega documenta
 
 A `project-audit` roda como portão antes do merge de entregas relevantes. A decisão de **como** executá-la é uma configuração do projeto, lida pela skill desta linha:
 
-**Modo de execução da project-audit:** perguntar
+**Modo de execução da project-audit:** subagente
 
-Valores aceitos: `perguntar` (a skill pergunta a cada auditoria), `subagente` (sempre em um subagente de contexto limpo, sem o histórico da implementação) ou `sessão atual` (na própria conversa). O padrão deste projeto é `perguntar`; para fixar uma decisão, troque o valor acima em um PR revisado. A auditoria em subagente é a recomendada para entregas complexas ou críticas (revisão independente do próprio autor); em qualquer modo ela só reporta, nunca corrige.
+Valores aceitos: `perguntar` (a skill pergunta a cada auditoria), `subagente` (sempre em um subagente de contexto limpo, sem o histórico da implementação) ou `sessão atual` (na própria conversa). O padrão anterior era `perguntar`; em 2026-10-03 o usuário fixou `subagente` (revisão independente, em contexto limpo). Para mudar a decisão, troque o valor acima em um PR revisado. A auditoria em subagente é a recomendada para entregas complexas ou críticas (revisão independente do próprio autor); em qualquer modo ela só reporta, nunca corrige.
 
 ## Parallel Execution
 
