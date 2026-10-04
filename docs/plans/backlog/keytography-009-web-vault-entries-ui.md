@@ -7,7 +7,7 @@ expected_version_impact: minor
 actual_version_impact: pending
 priority: medium
 sequence: 9
-depends_on: [keytography-008]
+depends_on: [keytography-008, keytography-017]
 authorized_capabilities:
   - docs/capabilities/web-interface/README.md
 decision_records: []
