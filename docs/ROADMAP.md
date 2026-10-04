@@ -2,7 +2,7 @@
 
 Índice compacto e ordenado do trabalho futuro. Cada linha linka para o plano com o detalhe real — este arquivo nunca carrega a narrativa completa.
 
-`keytography-001` a `keytography-006` foram concluídos — ver [docs/plans/completed/](./plans/completed/) — e fecham o roadmap original das 4 capabilities definidas no `PROJECT-BRIEF.md` (autenticação, cofre, avaliação e geração de senha). `keytography-007` (fundação da interface web) e `keytography-015` (governança automatizada) também estão concluídos.
+`keytography-001` a `keytography-006` foram concluídos — ver [docs/plans/completed/](./plans/completed/) — e fecham o roadmap original das 4 capabilities definidas no `PROJECT-BRIEF.md` (autenticação, cofre, avaliação e geração de senha). `keytography-007` (fundação da interface web), `keytography-008` (UI de autenticação) e `keytography-015` (governança automatizada) também estão concluídos.
 
 ## Interface Web (fase atual)
 
@@ -10,7 +10,6 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | UI de autenticação | [keytography-008](./plans/review/keytography-008-web-authentication-ui.md) — depende de keytography-007; em revisão (PR aberto) |
 | medium | Sessões gerenciadas pelo backend (API) | [keytography-016](./plans/backlog/keytography-016-backend-managed-sessions.md) — depende de keytography-008; precisa de aprovação humana (autenticação, sessão e DEK) |
 | medium | Interface web: sessão com refresh e logout real | [keytography-017](./plans/backlog/keytography-017-web-session-refresh-and-logout.md) — depende de keytography-016; deve ser mergeado logo após ele |
 | medium | UI de cofre (CRUD núcleo) | [keytography-009](./plans/backlog/keytography-009-web-vault-entries-ui.md) — depende de keytography-008 e keytography-017 |
@@ -20,7 +19,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 | medium | UI de supervisão do Admin (mínima) | [keytography-013](./plans/backlog/keytography-013-web-admin-supervision-ui.md) — depende de keytography-008, keytography-009 |
 | medium | Polimento visual, responsividade e interação | [keytography-014](./plans/backlog/keytography-014-web-visual-polish-and-interactions.md) — depende de keytography-010, 011, 012, 013 |
 
-`keytography-007` foi concluído em 2026-10-03 e `keytography-008` está em revisão. Os demais planos acima permanecem em `backlog` (`keytography-016` e `017` foram acrescentados em 2026-10-03, antes da UI de cofre, a pedido do usuário, para trazer as sessões gerenciadas pelo backend descritas no [ADR-0005](./decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md)) — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-007` foi concluído em 2026-10-03 e `keytography-008` em 2026-10-04. Os planos acima permanecem em `backlog` (`keytography-016` e `017` foram acrescentados em 2026-10-03, antes da UI de cofre, a pedido do usuário, para trazer as sessões gerenciadas pelo backend descritas no [ADR-0005](./decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md)) — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
 
 ## Processo e governança
 
