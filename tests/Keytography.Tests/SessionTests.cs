@@ -1,116 +1,47 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Keytography.Api.Auth;
-using Keytography.Api.Vault;
 using Keytography.Domain;
 using Keytography.Infrastructure;
 using Keytography.Tests.TestSupport;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
+using static Keytography.Tests.TestSupport.SessionTestKit;
 
 namespace Keytography.Tests;
 
 /// <summary>
 /// Sessoes gerenciadas pelo backend (keytography-016, ADR-0006): access token curto validado
 /// contra a sessao, refresh rotativo em cookie HttpOnly, logout/revogacao e DEK por sessao.
-/// Os clientes aqui nao guardam cookies sozinhos (HandleCookies = false): cada teste mostra
-/// explicitamente qual cookie de refresh esta enviando.
 /// </summary>
 public class SessionTests : IDisposable
 {
-    private const string Password = "supersecret1";
-    private const string AllowedOrigin = "http://localhost:5173";
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ApiFactory _factory = new();
-    private readonly HttpClient _client;
+    private readonly SessionTestKit _kit;
 
     public SessionTests()
     {
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        _kit = new SessionTestKit(_factory);
     }
 
     public void Dispose() => _factory.Dispose();
 
-    private sealed record Login(string AccessToken, DateTimeOffset ExpiresAt, string RefreshCookie, string SetCookie)
-    {
-        public Guid SessionId => Guid.Parse(new JwtSecurityTokenHandler().ReadJwtToken(AccessToken).Claims
-            .First(c => c.Type == JwtRegisteredClaimNames.Sid).Value);
-    }
-
-    private async Task RegisterAsync(string login, string email)
-    {
-        (await _client.PostAsJsonAsync("/auth/register", new RegisterRequest(login, email, Password))).EnsureSuccessStatusCode();
-        var token = AuthTestHelper.ExtractToken(_factory.EmailSender.SentEmails.Last(e => e.ToEmail == email).Body);
-        (await _client.PostAsJsonAsync("/auth/verify-email", new VerifyEmailRequest(token))).EnsureSuccessStatusCode();
-    }
-
-    private async Task<Login> LoginAsync(string login)
-    {
-        var response = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(login, Password));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions);
-        var (cookie, setCookie) = ReadRefreshCookie(response);
-        return new Login(body!.Token, body.ExpiresAt, cookie!, setCookie!);
-    }
-
-    private static (string? Value, string? Raw) ReadRefreshCookie(HttpResponseMessage response)
-    {
-        var raw = response.Headers.TryGetValues("Set-Cookie", out var values)
-            ? values.FirstOrDefault(v => v.StartsWith(SessionService.RefreshCookieName + "=", StringComparison.Ordinal))
-            : null;
-        var value = raw?[(SessionService.RefreshCookieName.Length + 1)..].Split(';')[0];
-        return (string.IsNullOrEmpty(value) ? null : value, raw);
-    }
+    private Task RegisterAsync(string login, string email) => _kit.RegisterAsync(login, email);
+    private Task<Login> LoginAsync(string login) => _kit.LoginAsync(login);
+    private Task<HttpResponseMessage> MeAsync(Login login) => _kit.MeAsync(login);
+    private Task<UserSession> LoadSessionAsync(Guid id) => _kit.LoadSessionAsync(id);
 
     private Task<HttpResponseMessage> SendAsync(
-        HttpMethod method, string url, string? accessToken = null, string? refreshCookie = null, string? origin = null)
-    {
-        var request = new HttpRequestMessage(method, url);
-        if (accessToken is not null)
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        }
+        HttpMethod method, string url, string? accessToken = null, string? refreshCookie = null, string? origin = null) =>
+        _kit.SendAsync(method, url, accessToken, refreshCookie, origin);
 
-        if (refreshCookie is not null)
-        {
-            request.Headers.Add("Cookie", $"{SessionService.RefreshCookieName}={refreshCookie}");
-        }
-
-        if (origin is not null)
-        {
-            request.Headers.Add("Origin", origin);
-        }
-
-        return _client.SendAsync(request);
-    }
-
-    private Task<HttpResponseMessage> MeAsync(Login login) => SendAsync(HttpMethod.Get, "/auth/me", login.AccessToken);
-
-    private async Task<UserSession> LoadSessionAsync(Guid sessionId)
-    {
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
-        return await db.UserSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId);
-    }
-
-    private async Task<HttpResponseMessage> CreateVaultEntryAsync(Login login) =>
-        await SendWithBodyAsync(HttpMethod.Post, "/vault/entries", login.AccessToken,
-            new CreateVaultEntryRequest("titulo", "login", "senha-da-conta", null));
-
-    private Task<HttpResponseMessage> SendWithBodyAsync<T>(HttpMethod method, string url, string accessToken, T body)
-    {
-        var request = new HttpRequestMessage(method, url) { Content = JsonContent.Create(body) };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        return _client.SendAsync(request);
-    }
+    private static string? NewCookieOf(HttpResponseMessage response) => ReadRefreshCookie(response).Value;
 
     // --- login -----------------------------------------------------------------------------
 
@@ -133,28 +64,70 @@ public class SessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Token_without_a_session_claim_is_rejected()
+    public async Task Refresh_cookie_expires_with_the_idle_expiry_of_the_session_and_is_not_secure_over_http()
     {
-        // JWT assinado com a chave certa, mas sem "sid" (como os emitidos antes das sessoes).
         await RegisterAsync("ana", "ana@example.com");
+
         var login = await LoginAsync("ana");
-        var handler = new JwtSecurityTokenHandler();
-        var original = handler.ReadJwtToken(login.AccessToken);
-        var withoutSid = new JwtSecurityToken(
-            original.Issuer, original.Audiences.First(),
-            original.Claims.Where(c => c.Type != JwtRegisteredClaimNames.Sid),
-            expires: DateTime.UtcNow.AddMinutes(5),
-            signingCredentials: new Microsoft.IdentityModel.Tokens.SigningCredentials(
-                new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                    System.Text.Encoding.UTF8.GetBytes("test-only-signing-key-0123456789-0123456789-0123456789")),
-                Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256));
 
-        var response = await SendAsync(HttpMethod.Get, "/auth/me", handler.WriteToken(withoutSid));
+        var session = await LoadSessionAsync(login.SessionId);
+        var expires = DateTimeOffset.Parse(
+            login.SetCookie.Split(';').Select(p => p.Trim()).First(p => p.StartsWith("expires=", StringComparison.OrdinalIgnoreCase))[8..]);
+        Assert.InRange((expires - session.IdleExpiresAt).Duration(), TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        Assert.DoesNotContain("secure", login.SetCookie.Replace("samesite", ""), StringComparison.OrdinalIgnoreCase);
+    }
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    [Fact]
+    public async Task Refresh_cookie_is_secure_when_the_request_arrives_over_https()
+    {
+        var httpsKit = new SessionTestKit(_factory, https: true);
+        await httpsKit.RegisterAsync("ana", "ana@example.com");
+
+        var login = await httpsKit.LoginAsync("ana");
+
+        Assert.Contains("secure", login.SetCookie.Replace("samesite", ""), StringComparison.OrdinalIgnoreCase);
     }
 
     // --- validacao por sessao ----------------------------------------------------------------
+
+    [Fact]
+    public async Task Token_without_a_session_claim_is_rejected()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        var forged = ForgeAccessToken(login.UserId, sessionId: null, DateTime.UtcNow.AddMinutes(5));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, "/auth/me", forged)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Token_naming_a_session_of_another_user_is_rejected()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        await RegisterAsync("bia", "bia@example.com");
+        var ana = await LoginAsync("ana");
+        var bia = await LoginAsync("bia");
+        // Assinado com a chave certa, mas com o "sub" de uma e o "sid" de outra.
+        var forged = ForgeAccessToken(bia.UserId, ana.SessionId, DateTime.UtcNow.AddMinutes(5));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, "/auth/me", forged)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Deleting_the_user_ends_its_sessions_immediately()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+            await db.Users.Where(u => u.Id == login.UserId).ExecuteDeleteAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(login)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie)).StatusCode);
+    }
 
     [Fact]
     public async Task Access_token_stops_working_the_moment_its_session_expires_by_inactivity()
@@ -171,28 +144,28 @@ public class SessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Session_ends_at_the_absolute_limit_even_with_continuous_refresh()
+    public async Task Idle_expiry_never_goes_past_the_absolute_limit_even_with_continuous_refresh()
     {
         await RegisterAsync("ana", "ana@example.com");
         var login = await LoginAsync("ana");
         var cookie = login.RefreshCookie;
 
-        // Refresh a cada 11 horas mantem a sessao viva por inatividade...
+        // Refresh a cada 11 horas mantem a sessao viva por inatividade ate o limite absoluto (168 h).
         for (var i = 0; i < 16; i++)
         {
             _factory.Time.Advance(TimeSpan.FromHours(11));
             var refresh = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: cookie);
+            var session = await LoadSessionAsync(login.SessionId);
+            Assert.True(session.IdleExpiresAt <= session.AbsoluteExpiresAt, "A inatividade passou do limite absoluto.");
+
             if (refresh.StatusCode != HttpStatusCode.OK)
             {
-                // ...ate o limite absoluto de 7 dias (168 h): o refresh deixa de funcionar.
-                Assert.True((i + 1) * 11 >= 168 - 11, $"Sessão terminou cedo demais (iteração {i + 1}).");
+                Assert.True(_factory.Time.GetUtcNow() >= session.AbsoluteExpiresAt, "A sessão terminou antes do limite absoluto.");
                 Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
-                var session = await LoadSessionAsync(login.SessionId);
-                Assert.True(_factory.Time.GetUtcNow() >= session.AbsoluteExpiresAt || session.IdleExpiresAt <= _factory.Time.GetUtcNow());
                 return;
             }
 
-            cookie = ReadRefreshCookie(refresh).Value!;
+            cookie = NewCookieOf(refresh)!;
         }
 
         Assert.Fail("A sessão não terminou no limite absoluto.");
@@ -207,7 +180,12 @@ public class SessionTests : IDisposable
 
         await SendAsync(HttpMethod.Post, "/auth/logout", login.AccessToken);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(login)).StatusCode);
+        var response = await MeAsync(login);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // A resposta nao conta por que a sessao deixou de valer.
+        var challenge = string.Join(" ", response.Headers.WwwAuthenticate.Select(h => h.ToString()));
+        Assert.DoesNotContain("revog", challenge, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sess", challenge, StringComparison.OrdinalIgnoreCase);
     }
 
     // --- refresh -----------------------------------------------------------------------------
@@ -230,12 +208,37 @@ public class SessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Old_refresh_token_after_the_grace_window_is_rejected_and_revokes_the_session()
+    public async Task Simultaneous_refreshes_with_the_same_cookie_rotate_only_once_and_never_lock_the_user_out()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+
+        // Varias rodadas: a corrida e probabilistica, e a falha antiga aparecia em quase todas.
+        for (var round = 0; round < 5; round++)
+        {
+            var login = await LoginAsync("ana");
+
+            var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
+                SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie)));
+
+            Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+            var rotatedCookies = responses.Select(NewCookieOf).Where(c => c is not null).ToList();
+            Assert.Single(rotatedCookies); // so um vencedor rotaciona; os demais caem na tolerancia
+
+            var session = await LoadSessionAsync(login.SessionId);
+            Assert.Null(session.RevokedAt);
+            // O cookie que o navegador guardaria (o do vencedor) continua funcionando.
+            var next = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: rotatedCookies[0]);
+            Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Old_refresh_token_after_the_grace_window_is_rejected_and_revokes_the_session_and_the_dek()
     {
         await RegisterAsync("ana", "ana@example.com");
         var login = await LoginAsync("ana");
         var rotated = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
-        var newCookie = ReadRefreshCookie(rotated).Value!;
+        var newCookie = NewCookieOf(rotated)!;
         _factory.Time.Advance(TimeSpan.FromSeconds(11));
 
         var reuse = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
@@ -244,6 +247,7 @@ public class SessionTests : IDisposable
         var session = await LoadSessionAsync(login.SessionId);
         Assert.NotNull(session.RevokedAt);
         Assert.Equal(SessionRevocationReason.ReuseDetected, session.RevokedReason);
+        Assert.Null(_factory.DekCache.Get(login.SessionId));
         // Nem o access token da sessao nem o refresh token "novo" valem mais.
         Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(login)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
@@ -256,15 +260,14 @@ public class SessionTests : IDisposable
         await RegisterAsync("ana", "ana@example.com");
         var login = await LoginAsync("ana");
         var first = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
-        var currentCookie = ReadRefreshCookie(first).Value!;
+        var currentCookie = NewCookieOf(first)!;
         _factory.Time.Advance(TimeSpan.FromSeconds(5));
 
         var simultaneous = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
 
         Assert.Equal(HttpStatusCode.OK, simultaneous.StatusCode);
-        Assert.Null(ReadRefreshCookie(simultaneous).Value);
-        var session = await LoadSessionAsync(login.SessionId);
-        Assert.Null(session.RevokedAt);
+        Assert.Null(NewCookieOf(simultaneous));
+        Assert.Null((await LoadSessionAsync(login.SessionId)).RevokedAt);
         // O cookie atual (o que o navegador recebeu da primeira resposta) continua valendo.
         Assert.Equal(HttpStatusCode.OK,
             (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: currentCookie)).StatusCode);
@@ -318,7 +321,7 @@ public class SessionTests : IDisposable
     {
         await RegisterAsync("ana", "ana@example.com");
         var login = await LoginAsync("ana");
-        Assert.Equal(HttpStatusCode.Created, (await CreateVaultEntryAsync(login)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await _kit.CreateVaultEntryAsync(login)).StatusCode);
 
         var logout = await SendAsync(HttpMethod.Post, "/auth/logout", refreshCookie: login.RefreshCookie, origin: AllowedOrigin);
 
@@ -330,11 +333,11 @@ public class SessionTests : IDisposable
         Assert.Equal(SessionRevocationReason.Logout, session.RevokedReason);
         Assert.Null(_factory.DekCache.Get(login.SessionId));
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, "/vault/entries", login.AccessToken)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await CreateVaultEntryAsync(login)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _kit.CreateVaultEntryAsync(login)).StatusCode);
     }
 
     [Fact]
-    public async Task Logout_is_idempotent_and_also_works_with_only_the_access_token()
+    public async Task Logout_is_idempotent_and_also_works_with_only_a_valid_access_token()
     {
         await RegisterAsync("ana", "ana@example.com");
         var login = await LoginAsync("ana");
@@ -350,6 +353,24 @@ public class SessionTests : IDisposable
     }
 
     [Fact]
+    public async Task Logout_with_only_an_expired_access_token_revokes_nothing_but_the_cookie_still_does()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        var expired = ForgeAccessToken(login.UserId, login.SessionId, DateTime.UtcNow.AddMinutes(-5));
+
+        // So com o token vencido o endpoint nao sabe quem e: 204, mas a sessao segue ativa.
+        var tokenOnly = await SendAsync(HttpMethod.Post, "/auth/logout", accessToken: expired);
+        Assert.Equal(HttpStatusCode.NoContent, tokenOnly.StatusCode);
+        Assert.Null((await LoadSessionAsync(login.SessionId)).RevokedAt);
+
+        // O cookie e o canal confiavel: revoga mesmo com o access token vencido.
+        var withCookie = await SendAsync(HttpMethod.Post, "/auth/logout", accessToken: expired, refreshCookie: login.RefreshCookie);
+        Assert.Equal(HttpStatusCode.NoContent, withCookie.StatusCode);
+        Assert.NotNull((await LoadSessionAsync(login.SessionId)).RevokedAt);
+    }
+
+    [Fact]
     public async Task Logging_out_one_session_keeps_the_vault_of_the_other_one_open()
     {
         await RegisterAsync("ana", "ana@example.com");
@@ -359,12 +380,12 @@ public class SessionTests : IDisposable
 
         await SendAsync(HttpMethod.Post, "/auth/logout", refreshCookie: first.RefreshCookie);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await CreateVaultEntryAsync(first)).StatusCode);
-        Assert.Equal(HttpStatusCode.Created, (await CreateVaultEntryAsync(second)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _kit.CreateVaultEntryAsync(first)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await _kit.CreateVaultEntryAsync(second)).StatusCode);
     }
 
     [Fact]
-    public async Task Each_login_gets_an_independent_dek_in_cache()
+    public async Task Each_login_gets_its_own_dek_entry_in_cache()
     {
         await RegisterAsync("ana", "ana@example.com");
         var first = await LoginAsync("ana");
@@ -408,23 +429,38 @@ public class SessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Completing_a_password_reset_revokes_all_sessions_of_the_user()
+    public async Task Completing_a_password_reset_revokes_all_sessions_and_deks_of_the_user_in_one_save()
     {
         await RegisterAsync("ana", "ana@example.com");
         var one = await LoginAsync("ana");
         var two = await LoginAsync("ana");
-        await _client.PostAsJsonAsync("/auth/forgot-password", new ForgotPasswordRequest("ana@example.com"));
+        await _kit.Client.PostAsJsonAsync("/auth/forgot-password", new ForgotPasswordRequest("ana@example.com"));
         var resetToken = AuthTestHelper.ExtractToken(
             _factory.EmailSender.SentEmails.Last(e => e.Subject.Contains("Redefinição")).Body);
 
-        var reset = await _client.PostAsJsonAsync("/auth/reset-password", new ResetPasswordRequest(resetToken, "nova-senha-123"));
+        var reset = await _kit.Client.PostAsJsonAsync("/auth/reset-password", new ResetPasswordRequest(resetToken, "nova-senha-123"));
 
         Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(one)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(two)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: one.RefreshCookie)).StatusCode);
-        Assert.Equal(SessionRevocationReason.PasswordReset, (await LoadSessionAsync(one.SessionId)).RevokedReason);
+        var revoked = await LoadSessionAsync(one.SessionId);
+        Assert.Equal(SessionRevocationReason.PasswordReset, revoked.RevokedReason);
+        Assert.Null(_factory.DekCache.Get(one.SessionId));
+        Assert.Null(_factory.DekCache.Get(two.SessionId));
+    }
+
+    [Fact]
+    public async Task A_failed_password_reset_does_not_touch_the_sessions()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+
+        var reset = await _kit.Client.PostAsJsonAsync("/auth/reset-password", new ResetPasswordRequest("token-invalido", "nova-senha-123"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, reset.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(login)).StatusCode);
     }
 
     // --- CSRF e CORS ---------------------------------------------------------------------------
@@ -439,9 +475,11 @@ public class SessionTests : IDisposable
 
         var evil = await SendAsync(HttpMethod.Post, url, refreshCookie: login.RefreshCookie, origin: "http://evil.example");
         var nullOrigin = await SendAsync(HttpMethod.Post, url, refreshCookie: login.RefreshCookie, origin: "null");
+        var otherPort = await SendAsync(HttpMethod.Post, url, refreshCookie: login.RefreshCookie, origin: "http://localhost:9999");
 
         Assert.Equal(HttpStatusCode.Forbidden, evil.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, nullOrigin.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, otherPort.StatusCode);
         // Nada aconteceu com a sessao.
         Assert.Equal(HttpStatusCode.OK, (await MeAsync(login)).StatusCode);
     }
@@ -453,7 +491,7 @@ public class SessionTests : IDisposable
         request.Headers.Add("Origin", AllowedOrigin);
         request.Headers.Add("Access-Control-Request-Method", "POST");
 
-        var response = await _client.SendAsync(request);
+        var response = await _kit.Client.SendAsync(request);
 
         Assert.True(response.IsSuccessStatusCode);
         Assert.Equal(AllowedOrigin, response.Headers.GetValues("Access-Control-Allow-Origin").Single());
@@ -463,7 +501,7 @@ public class SessionTests : IDisposable
     // --- banco ---------------------------------------------------------------------------------
 
     [Fact]
-    public async Task Sessions_ended_more_than_thirty_days_ago_are_removed_when_a_new_session_is_created()
+    public async Task Sessions_revoked_more_than_thirty_days_ago_are_removed_when_a_new_session_is_created()
     {
         await RegisterAsync("ana", "ana@example.com");
         var old = await LoginAsync("ana");
@@ -472,10 +510,44 @@ public class SessionTests : IDisposable
 
         var fresh = await LoginAsync("ana");
 
+        await AssertOnlySessionAsync(fresh.SessionId);
+    }
+
+    [Fact]
+    public async Task Sessions_expired_more_than_thirty_days_ago_are_removed_even_if_never_revoked()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        await LoginAsync("ana"); // nunca revogada: so expira (limite de 7 dias)
+        _factory.Time.Advance(TimeSpan.FromDays(38)); // 7 dias de vida + mais de 30 dias encerrada
+
+        var fresh = await LoginAsync("ana");
+
+        await AssertOnlySessionAsync(fresh.SessionId);
+    }
+
+    [Fact]
+    public async Task Sessions_ended_less_than_thirty_days_ago_are_kept()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var old = await LoginAsync("ana");
+        await SendAsync(HttpMethod.Post, "/auth/logout", refreshCookie: old.RefreshCookie);
+        _factory.Time.Advance(TimeSpan.FromDays(10));
+
+        var fresh = await LoginAsync("ana");
+
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
         var ids = await db.UserSessions.Select(s => s.Id).ToListAsync();
-        Assert.Equal([fresh.SessionId], ids);
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(fresh.SessionId, ids);
+    }
+
+    private async Task AssertOnlySessionAsync(Guid expected)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+        var ids = await db.UserSessions.Select(s => s.Id).ToListAsync();
+        Assert.Equal([expected], ids);
     }
 
     [Fact]

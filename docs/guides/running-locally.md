@@ -56,8 +56,9 @@ Desde `keytography-016`, o login cria uma sessão no banco: o access token (JWT)
 | `Sessions:IdleHours` | 12 | expiração por inatividade (renovada a cada refresh; também o TTL da DEK em cache) |
 | `Sessions:AbsoluteDays` | 7 | limite absoluto da sessão |
 | `Sessions:RotationGraceSeconds` | 10 | janela em que o refresh token anterior ainda é aceito (requisições simultâneas) |
+| `Sessions:ForceSecureCookie` | `false` | marca o cookie de refresh como `Secure` mesmo em requisições HTTP (proxy que termina TLS) |
 
-Valores inválidos fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. O cookie só é enviado pelo navegador para origens liberadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`); com `curl`, use um cookie jar (`-c` e `-b`). Até o `keytography-017`, a interface web ainda não renova o token e volta ao login quando o access token vence.
+Valores fora do intervalo aceito (positivos, com tetos de 1 dia para o access token, 30 dias de inatividade, 365 dias absolutos e 5 minutos de tolerância) fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. A API só aceita chamadas de navegador com credenciais, e só confere o `Origin` de `refresh`/`logout`, para origens liberadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`); o envio do cookie em si segue as regras do navegador (`SameSite=Strict`, host e `Path=/auth`); com `curl`, use um cookie jar (`-c` e `-b`). Até o `keytography-017`, a interface web ainda não renova o token e volta ao login quando o access token vence.
 
 ## Segredos locais (chave de recuperação do cofre)
 

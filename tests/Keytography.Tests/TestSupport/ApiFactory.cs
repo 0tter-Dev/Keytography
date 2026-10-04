@@ -12,6 +12,20 @@ namespace Keytography.Tests.TestSupport;
 
 public class ApiFactory : WebApplicationFactory<Program>, IDisposable
 {
+    private readonly IReadOnlyDictionary<string, string?> _extraConfiguration;
+
+    // Construtor sem parametros: o xUnit o usa para IClassFixture<ApiFactory>.
+    public ApiFactory()
+        : this(new Dictionary<string, string?>())
+    {
+    }
+
+    /// <param name="extraConfiguration">Configuracao adicional (ex.: Sessions:*), aplicada por cima da base.</param>
+    internal ApiFactory(IReadOnlyDictionary<string, string?> extraConfiguration)
+    {
+        _extraConfiguration = extraConfiguration;
+    }
+
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"keytography-test-{Guid.NewGuid():N}.db");
 
     // 2048 bits por velocidade de geracao em teste - o minimo de 3072 do ADR-0001
@@ -37,6 +51,7 @@ public class ApiFactory : WebApplicationFactory<Program>, IDisposable
                 ["Jwt:Audience"] = "Keytography.Tests",
                 ["Recovery:PrivateKeyPem"] = _testRecoveryKey.ExportRSAPrivateKeyPem()
             });
+            configBuilder.AddInMemoryCollection(_extraConfiguration);
         });
 
         builder.ConfigureServices(services =>

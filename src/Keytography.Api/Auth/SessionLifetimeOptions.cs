@@ -8,6 +8,12 @@ public class SessionLifetimeOptions
 {
     public const string SectionName = "Sessions";
 
+    // Tetos: valores absurdos estourariam TimeSpan/DateTimeOffset so no primeiro login.
+    private const int MaxAccessTokenMinutes = 24 * 60;
+    private const int MaxIdleHours = 24 * 30;
+    private const int MaxAbsoluteDays = 365;
+    private const int MaxRotationGraceSeconds = 300;
+
     /// <summary>Vida do access token (JWT). Curto: a sessao e quem manda, o JWT so a representa.</summary>
     public int AccessTokenMinutes { get; set; } = 15;
 
@@ -20,18 +26,29 @@ public class SessionLifetimeOptions
     /// <summary>Janela em que o refresh token anterior ainda e aceito, para requisicoes simultaneas.</summary>
     public int RotationGraceSeconds { get; set; } = 10;
 
+    /// <summary>
+    /// Marca o cookie de refresh como Secure mesmo quando a requisicao chega como HTTP (ex.: atras
+    /// de um proxy que termina TLS). Sem isso, Secure so e usado em requisicoes HTTPS.
+    /// </summary>
+    public bool ForceSecureCookie { get; set; }
+
     public TimeSpan AccessTokenLifetime => TimeSpan.FromMinutes(AccessTokenMinutes);
     public TimeSpan IdleLifetime => TimeSpan.FromHours(IdleHours);
     public TimeSpan AbsoluteLifetime => TimeSpan.FromDays(AbsoluteDays);
     public TimeSpan RotationGrace => TimeSpan.FromSeconds(RotationGraceSeconds);
 
-    /// <summary>Falha cedo, no startup, se algum valor nao for positivo.</summary>
+    /// <summary>Falha cedo, no startup, se algum valor estiver fora do intervalo aceito.</summary>
     public void Validate()
     {
-        if (AccessTokenMinutes <= 0 || IdleHours <= 0 || AbsoluteDays <= 0 || RotationGraceSeconds < 0)
+        if (AccessTokenMinutes is < 1 or > MaxAccessTokenMinutes
+            || IdleHours is < 1 or > MaxIdleHours
+            || AbsoluteDays is < 1 or > MaxAbsoluteDays
+            || RotationGraceSeconds is < 0 or > MaxRotationGraceSeconds)
         {
             throw new InvalidOperationException(
-                "Sessions:AccessTokenMinutes, IdleHours e AbsoluteDays devem ser positivos e RotationGraceSeconds nao pode ser negativo.");
+                $"Sessions inválido: AccessTokenMinutes deve ficar entre 1 e {MaxAccessTokenMinutes}, " +
+                $"IdleHours entre 1 e {MaxIdleHours}, AbsoluteDays entre 1 e {MaxAbsoluteDays} " +
+                $"e RotationGraceSeconds entre 0 e {MaxRotationGraceSeconds}.");
         }
     }
 }

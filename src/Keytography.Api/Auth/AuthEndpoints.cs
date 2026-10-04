@@ -229,7 +229,7 @@ public static class AuthEndpoints
 
         if (session is not null)
         {
-            await sessions.RevokeAsync(session, SessionRevocationReason.Logout, cancellationToken);
+            await sessions.RevokeAsync(session.Id, SessionRevocationReason.Logout, cancellationToken);
         }
 
         sessions.ClearRefreshCookie(httpContext);
@@ -319,10 +319,13 @@ public static class AuthEndpoints
         user.PasswordHash = PasswordHasher.Hash(newPassword);
         token.UsedAt = DateTimeOffset.UtcNow;
 
-        await db.SaveChangesAsync(cancellationToken);
+        // A credencial mudou: nenhuma sessao aberta com a senha antiga continua valendo. A
+        // revogacao entra na MESMA transacao da troca de senha (um unico SaveChanges); so as
+        // DEKs em memoria sao removidas depois do commit.
+        var revokedSessions = await sessions.MarkAllRevokedAsync(user.Id, SessionRevocationReason.PasswordReset, cancellationToken);
 
-        // A credencial mudou: nenhuma sessao aberta com a senha antiga continua valendo.
-        await sessions.RevokeAllAsync(user.Id, SessionRevocationReason.PasswordReset, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        sessions.ForgetDeks(revokedSessions);
 
         return Results.Ok(new MessageResponse("Senha redefinida com sucesso."));
     }

@@ -6,9 +6,12 @@ namespace Keytography.Api.Auth;
 /// </summary>
 public static class AllowedOrigins
 {
+    /// <summary>Origens configuradas, sem a barra final (o navegador nunca a envia em Origin).</summary>
     public static string[] Resolve(IConfiguration configuration) =>
-        configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-        ?? ["http://localhost:5173", "http://127.0.0.1:5173"];
+        (configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? ["http://localhost:5173", "http://127.0.0.1:5173"])
+        .Select(origin => origin.Trim().TrimEnd('/'))
+        .ToArray();
 
     /// <summary>
     /// Protecao CSRF dos endpoints que aceitam o cookie de refresh: alem de SameSite=Strict,
@@ -22,6 +25,6 @@ public static class AllowedOrigins
             return true;
         }
 
-        return Resolve(configuration).Contains(origin.ToString(), StringComparer.OrdinalIgnoreCase);
+        return Resolve(configuration).Contains(origin.ToString().TrimEnd('/'), StringComparer.OrdinalIgnoreCase);
     }
 }

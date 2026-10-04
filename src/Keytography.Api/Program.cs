@@ -95,7 +95,10 @@ builder.Services
             ValidAudience = jwtAudience,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            // Sem tolerancia de relogio: a sessao (conferida no banco) e quem manda, e o access
+            // token vale exatamente o tempo configurado em Sessions:AccessTokenMinutes.
+            ClockSkew = TimeSpan.Zero
         };
 
         // O JWT so vale enquanto a sessao dele (claim "sid") existir, nao estiver revogada e nao

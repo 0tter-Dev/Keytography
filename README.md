@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Abre em `http://localhost:5173`, na tela de login. Hoje a interface entrega a fundação (layout responsivo, temas, cliente de API tipado) e a autenticação (criar conta, verificar e-mail, entrar, redefinir senha); depois de entrar, a tela inicial ainda mostra só o estado do sistema. Em desenvolvimento a API não envia e-mail: o token de verificação aparece no log do `dotnet run` (passo a passo em [docs/guides/running-locally.md](./docs/guides/running-locally.md#primeiro-acesso-na-interface-web)). As telas de cofre, avaliação e geração de senha ainda estão em desenvolvimento — veja [docs/ROADMAP.md](./docs/ROADMAP.md) e [docs/STATUS.md](./docs/STATUS.md).
+Abre em `http://localhost:5173`, na tela de login (até o `keytography-017` a interface ainda não renova a sessão e volta ao login a cada 15 minutos, o tempo do access token). Hoje a interface entrega a fundação (layout responsivo, temas, cliente de API tipado) e a autenticação (criar conta, verificar e-mail, entrar, redefinir senha); depois de entrar, a tela inicial ainda mostra só o estado do sistema. Em desenvolvimento a API não envia e-mail: o token de verificação aparece no log do `dotnet run` (passo a passo em [docs/guides/running-locally.md](./docs/guides/running-locally.md#primeiro-acesso-na-interface-web)). As telas de cofre, avaliação e geração de senha ainda estão em desenvolvimento — veja [docs/ROADMAP.md](./docs/ROADMAP.md) e [docs/STATUS.md](./docs/STATUS.md).
 
 ## Current Scope
 

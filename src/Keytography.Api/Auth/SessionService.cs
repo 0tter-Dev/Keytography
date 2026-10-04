@@ -5,6 +5,7 @@ using System.Text;
 using Keytography.Domain;
 using Keytography.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Keytography.Api.Auth;
@@ -31,7 +32,7 @@ public class SessionService
         IDekCache dekCache,
         IConfiguration configuration,
         TimeProvider time,
-        Microsoft.Extensions.Options.IOptions<SessionLifetimeOptions> options)
+        IOptions<SessionLifetimeOptions> options)
     {
         _db = db;
         _dekCache = dekCache;
@@ -84,6 +85,11 @@ public class SessionService
     /// inatividade renovada, TTL da DEK renovado); o token anterior ainda e aceito por uma
     /// janela curta (sem nova rotacao) e, fora dela, o reuso revoga a sessao inteira.
     /// </summary>
+    /// <remarks>
+    /// A rotacao e atomica: um UPDATE condicionado ao hash lido. Dois refreshes simultaneos com o
+    /// mesmo cookie nao rotacionam duas vezes - o que perde a corrida relê a sessao, encontra o
+    /// token como "anterior" e cai na tolerancia (recebe so um access token, sem novo cookie).
+    /// </remarks>
     public async Task<RefreshResult> RefreshAsync(string? refreshToken, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(refreshToken))
@@ -91,52 +97,85 @@ public class SessionService
             return new RefreshResult(RefreshOutcome.Invalid);
         }
 
-        var now = _time.GetUtcNow();
         var hash = Hash(refreshToken);
-        var session = await _db.UserSessions.FirstOrDefaultAsync(
-            s => s.RefreshTokenHash == hash || s.PreviousRefreshTokenHash == hash, cancellationToken);
 
-        if (session is null || !session.IsActive(now))
+        // Segunda passada so acontece se a rotacao condicional perdeu a corrida para outro refresh.
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            return new RefreshResult(RefreshOutcome.Invalid);
-        }
+            var now = _time.GetUtcNow();
+            var session = await _db.UserSessions.AsNoTracking().FirstOrDefaultAsync(
+                s => s.RefreshTokenHash == hash || s.PreviousRefreshTokenHash == hash, cancellationToken);
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == session.UserId, cancellationToken);
-        if (user is null || !user.EmailVerified)
-        {
-            return new RefreshResult(RefreshOutcome.Invalid);
-        }
-
-        // Comparacao do hash atual primeiro: se os dois coincidirem (nao deveriam), vale o atual.
-        if (session.RefreshTokenHash != hash)
-        {
-            if (session.RefreshRotatedAt is { } rotatedAt && now - rotatedAt <= _options.RotationGrace)
+            if (session is null || !session.IsActive(now))
             {
-                return new RefreshResult(RefreshOutcome.WithinGrace, session, user);
+                return new RefreshResult(RefreshOutcome.Invalid);
             }
 
-            await RevokeAsync(session, SessionRevocationReason.ReuseDetected, cancellationToken);
-            return new RefreshResult(RefreshOutcome.ReuseDetected);
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == session.UserId, cancellationToken);
+            if (user is null || !user.EmailVerified)
+            {
+                return new RefreshResult(RefreshOutcome.Invalid);
+            }
+
+            if (session.RefreshTokenHash != hash)
+            {
+                if (session.RefreshRotatedAt is { } rotatedAt && now - rotatedAt <= _options.RotationGrace)
+                {
+                    return new RefreshResult(RefreshOutcome.WithinGrace, session, user);
+                }
+
+                await RevokeAsync(session.Id, SessionRevocationReason.ReuseDetected, cancellationToken);
+                return new RefreshResult(RefreshOutcome.ReuseDetected);
+            }
+
+            var newToken = NewRefreshToken();
+            var newHash = Hash(newToken);
+            var idleExpiresAt = IdleExpiryFrom(now, session);
+
+            var rotated = await _db.UserSessions
+                .Where(s => s.Id == session.Id && s.RefreshTokenHash == hash && s.RevokedAt == null)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(s => s.PreviousRefreshTokenHash, hash)
+                    .SetProperty(s => s.RefreshTokenHash, newHash)
+                    .SetProperty(s => s.RefreshRotatedAt, (DateTimeOffset?)now)
+                    .SetProperty(s => s.LastRefreshedAt, now)
+                    .SetProperty(s => s.IdleExpiresAt, idleExpiresAt), cancellationToken);
+
+            if (rotated == 1)
+            {
+                session.PreviousRefreshTokenHash = hash;
+                session.RefreshTokenHash = newHash;
+                session.RefreshRotatedAt = now;
+                session.LastRefreshedAt = now;
+                session.IdleExpiresAt = idleExpiresAt;
+
+                await RenewDekAsync(session, now, cancellationToken);
+                return new RefreshResult(RefreshOutcome.Rotated, session, user, newToken);
+            }
         }
 
-        var newToken = NewRefreshToken();
-        session.PreviousRefreshTokenHash = session.RefreshTokenHash;
-        session.RefreshTokenHash = Hash(newToken);
-        session.RefreshRotatedAt = now;
-        session.LastRefreshedAt = now;
-        session.IdleExpiresAt = IdleExpiryFrom(now, session);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        RenewDek(session, now);
-        return new RefreshResult(RefreshOutcome.Rotated, session, user, newToken);
+        return new RefreshResult(RefreshOutcome.Invalid);
     }
 
-    /// <summary>Renova o TTL da DEK da sessao (se ainda estiver em cache) a partir da expiracao atual dela.</summary>
-    public void RenewDek(UserSession session, DateTimeOffset now)
+    /// <summary>
+    /// Renova o TTL da DEK da sessao (se ainda estiver em cache) a partir da expiracao atual dela.
+    /// Se a sessao foi revogada enquanto isso (logout concorrente), a DEK nao pode "ressuscitar":
+    /// a conferencia depois do Set garante que ou o logout remove a DEK, ou nos removemos.
+    /// </summary>
+    public async Task RenewDekAsync(UserSession session, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        if (_dekCache.Get(session.Id) is { } dek)
+        if (_dekCache.Get(session.Id) is not { } dek)
         {
-            _dekCache.Set(session.Id, dek, session.IdleExpiresAt - now);
+            return;
+        }
+
+        _dekCache.Set(session.Id, dek, session.IdleExpiresAt - now);
+
+        var revoked = await _db.UserSessions.AsNoTracking()
+            .AnyAsync(s => s.Id == session.Id && s.RevokedAt != null, cancellationToken);
+        if (revoked)
+        {
+            _dekCache.Remove(session.Id);
         }
     }
 
@@ -172,20 +211,24 @@ public class SessionService
     }
 
     /// <summary>Revoga a sessao (se ainda ativa) e remove a DEK dela do cache. Idempotente.</summary>
-    public async Task RevokeAsync(UserSession session, SessionRevocationReason reason, CancellationToken cancellationToken)
+    public async Task RevokeAsync(Guid sessionId, SessionRevocationReason reason, CancellationToken cancellationToken)
     {
-        if (session.RevokedAt is null)
-        {
-            session.RevokedAt = _time.GetUtcNow();
-            session.RevokedReason = reason;
-            await _db.SaveChangesAsync(cancellationToken);
-        }
+        var now = _time.GetUtcNow();
+        await _db.UserSessions
+            .Where(s => s.Id == sessionId && s.RevokedAt == null)
+            .ExecuteUpdateAsync(set => set
+                .SetProperty(s => s.RevokedAt, (DateTimeOffset?)now)
+                .SetProperty(s => s.RevokedReason, (SessionRevocationReason?)reason), cancellationToken);
 
-        _dekCache.Remove(session.Id);
+        _dekCache.Remove(sessionId);
     }
 
-    /// <summary>Revoga todas as sessoes ainda nao revogadas do usuario e remove as DEKs delas.</summary>
-    public async Task RevokeAllAsync(Guid userId, SessionRevocationReason reason, CancellationToken cancellationToken)
+    /// <summary>
+    /// Marca como revogadas, no contexto atual e SEM salvar, todas as sessoes ainda nao
+    /// revogadas do usuario. Permite revogar na mesma transacao de outra mudanca (troca de
+    /// senha); depois do <c>SaveChanges</c> o chamador remove as DEKs com <see cref="ForgetDeks"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> MarkAllRevokedAsync(Guid userId, SessionRevocationReason reason, CancellationToken cancellationToken)
     {
         var now = _time.GetUtcNow();
         var sessions = await _db.UserSessions
@@ -196,10 +239,26 @@ public class SessionService
         {
             session.RevokedAt = now;
             session.RevokedReason = reason;
-            _dekCache.Remove(session.Id);
         }
 
+        return sessions.Select(s => s.Id).ToList();
+    }
+
+    /// <summary>Remove do cache as DEKs das sessoes informadas.</summary>
+    public void ForgetDeks(IEnumerable<Guid> sessionIds)
+    {
+        foreach (var sessionId in sessionIds)
+        {
+            _dekCache.Remove(sessionId);
+        }
+    }
+
+    /// <summary>Revoga todas as sessoes ainda nao revogadas do usuario e remove as DEKs delas.</summary>
+    public async Task RevokeAllAsync(Guid userId, SessionRevocationReason reason, CancellationToken cancellationToken)
+    {
+        var ids = await MarkAllRevokedAsync(userId, reason, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
+        ForgetDeks(ids);
     }
 
     /// <summary>Sessao ativa referente ao access token (claim sid), ou null.</summary>
@@ -219,12 +278,12 @@ public class SessionService
         }
 
         var hash = Hash(refreshToken);
-        return await _db.UserSessions.FirstOrDefaultAsync(
+        return await _db.UserSessions.AsNoTracking().FirstOrDefaultAsync(
             s => s.RefreshTokenHash == hash || s.PreviousRefreshTokenHash == hash, cancellationToken);
     }
 
     public Task<UserSession?> FindByIdAsync(Guid sessionId, CancellationToken cancellationToken) =>
-        _db.UserSessions.FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken);
+        _db.UserSessions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sessionId, cancellationToken);
 
     public void WriteRefreshCookie(HttpContext context, string refreshToken, UserSession session) =>
         context.Response.Cookies.Append(RefreshCookieName, refreshToken, CookieOptions(context, session.IdleExpiresAt));
@@ -232,11 +291,12 @@ public class SessionService
     public void ClearRefreshCookie(HttpContext context) =>
         context.Response.Cookies.Delete(RefreshCookieName, CookieOptions(context, null));
 
-    private static CookieOptions CookieOptions(HttpContext context, DateTimeOffset? expires) => new()
+    private CookieOptions CookieOptions(HttpContext context, DateTimeOffset? expires) => new()
     {
         HttpOnly = true,
         SameSite = SameSiteMode.Strict,
-        Secure = context.Request.IsHttps,
+        // Atras de um proxy que termina TLS a requisicao chega como HTTP: ForceSecureCookie cobre esse caso.
+        Secure = _options.ForceSecureCookie || context.Request.IsHttps,
         Path = RefreshCookiePath,
         // Cookie persistente, com a mesma validade da sessao por inatividade: recarregar a
         // pagina ou abrir outra aba restaura a sessao, mas ela nao sobrevive a sua expiracao.
