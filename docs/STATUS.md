@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend completo: `keytography-001` a `keytography-006` concluídos — as 4 capabilities do roadmap original (autenticação, cofre, avaliação e geração de senha) estão `implemented`. Interface web em andamento: a fundação (`keytography-007`) está concluída; a UI de autenticação (`keytography-008`) está em revisão (PR aberto); `009` a `014`, mais as sessões gerenciadas pelo backend (`016` e `017`, que vêm antes da UI de cofre), seguem em `backlog`. A verificação automática de governança documental e de convenções de PR (`keytography-015`) também está concluída.
+Core/backend completo: `keytography-001` a `keytography-006` concluídos — as 4 capabilities do roadmap original (autenticação, cofre, avaliação e geração de senha) estão `implemented`. Interface web em andamento: a fundação (`keytography-007`) está concluída; a UI de autenticação (`keytography-008`) também; `009` a `014`, mais as sessões gerenciadas pelo backend (`016` e `017`, que vêm antes da UI de cofre), seguem em `backlog`. A verificação automática de governança documental e de convenções de PR (`keytography-015`) também está concluída.
 
 ## Milestones
 
@@ -18,6 +18,7 @@ Core/backend completo: `keytography-001` a `keytography-006` concluídos — as 
 - **2026-10-01** — [keytography-006](./plans/completed/keytography-006-password-generator.md) concluído ([PR #12](https://github.com/0tter-Dev/Keytography/pull/12)): gerador de senha configurável (`POST /passwords/generate`) com CSPRNG, exclusão de caracteres ambíguos, e exigência de força mínima validada pelo motor de `keytography-005`. Fecha o roadmap original de 4 capabilities do `PROJECT-BRIEF.md`.
 - **2026-10-03** — [keytography-007](./plans/completed/keytography-007-web-frontend-scaffolding-and-foundation.md) concluído ([PR #15](https://github.com/0tter-Dev/Keytography/pull/15)): fundação da interface web (React + TypeScript + Vite em `web/`, tooling, [convenções](./guides/web-frontend-conventions.md), sistema de temas 5 × 9, i18n `pt-BR`, casca de layout responsiva, cliente de API tipado gerado do [contrato OpenAPI](./reference/README.md), CORS e job de CI do frontend).
 - **2026-10-03** — [keytography-015](./plans/completed/keytography-015-governance-checks-in-ci.md) concluído ([PR #21](https://github.com/0tter-Dev/Keytography/pull/21)): a governança documental (planos, dashboards, links internos, README raiz nos planos) e a convenção de nomes de branches e PRs viram verificações automáticas em `dotnet test` e no CI.
+- **2026-10-04** — [keytography-008](./plans/completed/keytography-008-web-authentication-ui.md) concluído ([PR #23](https://github.com/0tter-Dev/Keytography/pull/23)): UI de autenticação (registro, verificação de e-mail, login, esqueci/redefinir senha), sessão com JWT em `sessionStorage`, rotas protegidas e logout local; modelo registrado no [ADR-0005](./decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md). A evolução para sessões gerenciadas pelo backend está planejada em `keytography-016` e `keytography-017`.
 
 ## Capability Dashboard
 

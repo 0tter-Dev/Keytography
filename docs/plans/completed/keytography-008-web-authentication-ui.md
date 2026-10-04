@@ -1,10 +1,10 @@
 ---
 id: keytography-008
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: medium
 sequence: 8
 depends_on: [keytography-007]
@@ -94,3 +94,13 @@ Aprovado pelo usuário em 2026-10-03, ao pedir explicitamente a ativação e a i
 - Capabilities de backend (`authentication-and-users` etc.): constatação deliberada de que não precisam mudar — nenhum comportamento da API mudou (e estão fora de `authorized_capabilities`).
 
 ## Outcome
+
+Entregue via [PR #23](https://github.com/0tter-Dev/Keytography/pull/23), mergeada em `main` (squash) no commit `b14a422` em 2026-10-04. Commits da branch: `3299a76` (UI de autenticação: telas, sessão, rotas protegidas, logout), `111e50b` (documentação e movimentação do plano para `review`) e `614949b` (ajustes da `project-audit`). O CI passou no PR (jobs `build` e `web`) e na `main` após o merge.
+
+Auditado via `project-audit` como gate pré-merge, em subagente de contexto limpo (modo escolhido pelo usuário e depois fixado em `docs/plans/README.md` pelo [PR #24](https://github.com/0tter-Dev/Keytography/pull/24)). Sem achados críticos. Corrigidos no mesmo PR, com aprovação do usuário: destino guardado ao redirecionar para o login que nunca era restaurado (I-1), aviso de sucesso persistente em "esqueci minha senha" (M-1), cache de consultas só limpo no logout (M-2, agora por `SessionController` em qualquer fim de sessão), JWT anexado a endpoints anônimos (M-3) e texto residual do plano (M-4); e registrado o [ADR-0005](../../decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md) com o modelo de sessão do cliente. Pendências conhecidas, não corrigidas aqui: rota 404 e foco no alerta de erro após submit (a tratar em `keytography-014`), e o bundle JS de cerca de 518 kB sem divisão por rota (já registrado em `keytography-007`).
+
+Validação final: no `web/`, 116/116 testes do Vitest, `npm run lint`, `npm run format:check`, `npm run build` e `npm run api:types` (sem diferença em `schema.d.ts`) limpos; `dotnet test` com 84/84 testes passando (Release), incluindo a governança documental. Verificação manual ponta a ponta contra a API real (banco descartável) antes da auditoria: registro, login antes da verificação (mensagem específica), token de verificação inválido e válido, login inválido e válido, sessão em `sessionStorage`, token corrompido levando ao login com aviso de expiração, redefinição de senha (a senha antiga deixa de funcionar), logout. As correções posteriores à auditoria foram cobertas por testes automatizados, sem nova rodada manual. Conferência visual limitada a medidas de layout mobile (o painel do navegador não desenhou screenshots).
+
+Decisão de sessão registrada no `Approval` e no ADR-0005: JWT em `sessionStorage` e logout só local, com a evolução desejada (sessões gerenciadas e persistidas pelo backend, com refresh e revogação) planejada em `keytography-016` (backend) e `keytography-017` (interface web), ainda em `backlog` ([PR #25](https://github.com/0tter-Dev/Keytography/pull/25)).
+
+`actual_version_impact: minor` — coerente com `expected_version_impact`, sem divergência a justificar (novos recursos aditivos na interface; nenhuma mudança na API nem no contrato OpenAPI).
