@@ -47,7 +47,7 @@ public static class VaultEndpoints
         CancellationToken cancellationToken)
     {
         var userId = claimsPrincipal.GetUserId();
-        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
+        using var dek = dekCache.Lease(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
@@ -64,11 +64,11 @@ public static class VaultEndpoints
             UserId = userId,
             Title = request.Title,
             Login = request.Login,
-            EncryptedPassword = AesGcmCipher.EncryptString(dek, password),
+            EncryptedPassword = AesGcmCipher.EncryptString(dek.Value, password),
             AdditionalFieldsJson = SerializeFields(request.AdditionalFields)
         };
 
-        var otherPasswords = await PasswordEvaluationSupport.GetOtherPasswordsForUserAsync(db, userId, entry.Id, dek, cancellationToken);
+        var otherPasswords = await PasswordEvaluationSupport.GetOtherPasswordsForUserAsync(db, userId, entry.Id, dek.Value, cancellationToken);
         var evaluation = PasswordEvaluator.Evaluate(new PasswordEvaluationContext(password, [], otherPasswords), criteria);
         PasswordEvaluationSupport.ApplyEvaluation(entry, evaluation);
 
@@ -122,13 +122,13 @@ public static class VaultEndpoints
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
+        using var dek = dekCache.Lease(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
         }
 
-        return Results.Ok(ToDetail(entry, AesGcmCipher.DecryptString(dek, entry.EncryptedPassword)));
+        return Results.Ok(ToDetail(entry, AesGcmCipher.DecryptString(dek.Value, entry.EncryptedPassword)));
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -153,7 +153,7 @@ public static class VaultEndpoints
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
+        using var dek = dekCache.Lease(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
@@ -165,12 +165,12 @@ public static class VaultEndpoints
         }
 
         var newPassword = request.Password ?? string.Empty;
-        var currentPassword = AesGcmCipher.DecryptString(dek, entry.EncryptedPassword);
+        var currentPassword = AesGcmCipher.DecryptString(dek.Value, entry.EncryptedPassword);
 
         var thisEntryHistory = (await db.VaultEntryHistories
             .Where(h => h.VaultEntryId == entry.Id)
             .ToListAsync(cancellationToken))
-            .Select(h => AesGcmCipher.DecryptString(dek, h.EncryptedPassword))
+            .Select(h => AesGcmCipher.DecryptString(dek.Value, h.EncryptedPassword))
             .ToList();
 
         if (currentPassword != newPassword)
@@ -180,7 +180,7 @@ public static class VaultEndpoints
                 VaultEntryId = entry.Id,
                 EncryptedPassword = entry.EncryptedPassword
             });
-            entry.EncryptedPassword = AesGcmCipher.EncryptString(dek, newPassword);
+            entry.EncryptedPassword = AesGcmCipher.EncryptString(dek.Value, newPassword);
             thisEntryHistory.Add(currentPassword);
         }
 
@@ -189,7 +189,7 @@ public static class VaultEndpoints
         entry.AdditionalFieldsJson = SerializeFields(request.AdditionalFields);
         entry.UpdatedAt = DateTimeOffset.UtcNow;
 
-        var otherPasswords = await PasswordEvaluationSupport.GetOtherPasswordsForUserAsync(db, userId, entry.Id, dek, cancellationToken);
+        var otherPasswords = await PasswordEvaluationSupport.GetOtherPasswordsForUserAsync(db, userId, entry.Id, dek.Value, cancellationToken);
         var evaluation = PasswordEvaluator.Evaluate(new PasswordEvaluationContext(newPassword, thisEntryHistory, otherPasswords), criteria);
         PasswordEvaluationSupport.ApplyEvaluation(entry, evaluation);
 
@@ -214,7 +214,7 @@ public static class VaultEndpoints
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        var dek = dekCache.Get(claimsPrincipal.GetSessionId());
+        using var dek = dekCache.Lease(claimsPrincipal.GetSessionId());
         if (dek is null)
         {
             return SessionExpired();
@@ -226,7 +226,8 @@ public static class VaultEndpoints
             .OrderByDescending(h => h.ChangedAt);
 
         var result = history.Select(h =>
-            new VaultEntryHistoryItemResponse(h.Id, AesGcmCipher.DecryptString(dek, h.EncryptedPassword), h.ChangedAt));
+            new VaultEntryHistoryItemResponse(h.Id, AesGcmCipher.DecryptString(dek.Value, h.EncryptedPassword), h.ChangedAt))
+            .ToList(); // materializa ANTES de a DEK ser zerada ao sair do metodo
 
         return Results.Ok(result);
     }
@@ -308,7 +309,7 @@ public static class VaultEndpoints
             return Results.NotFound();
         }
 
-        var dek = RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek);
+        using var dek = new SecretBytes(RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek));
 
         var items = (await db.VaultEntries
             .Where(e => e.UserId == userId && !e.IsDeleted)
@@ -329,8 +330,8 @@ public static class VaultEndpoints
             return Results.NotFound();
         }
 
-        var dek = RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek);
-        return Results.Ok(ToDetail(entry, AesGcmCipher.DecryptString(dek, entry.EncryptedPassword)));
+        using var dek = new SecretBytes(RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek));
+        return Results.Ok(ToDetail(entry, AesGcmCipher.DecryptString(dek.Value, entry.EncryptedPassword)));
     }
 
     private static IResult? ValidateTitle(string? title) =>

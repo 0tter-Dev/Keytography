@@ -56,9 +56,19 @@ public sealed class SessionTestKit
         (await Client.PostAsJsonAsync("/auth/verify-email", new VerifyEmailRequest(token))).EnsureSuccessStatusCode();
     }
 
-    public async Task<Login> LoginAsync(string login)
+    /// <param name="refreshCookie">Cookie de refresh que o navegador enviaria junto (sessao anterior), se houver.</param>
+    public async Task<Login> LoginAsync(string login, string? refreshCookie = null)
     {
-        var response = await Client.PostAsJsonAsync("/auth/login", new LoginRequest(login, Password));
+        var request = new HttpRequestMessage(HttpMethod.Post, "/auth/login")
+        {
+            Content = JsonContent.Create(new LoginRequest(login, Password))
+        };
+        if (refreshCookie is not null)
+        {
+            request.Headers.Add("Cookie", $"{SessionService.RefreshCookieName}={refreshCookie}");
+        }
+
+        var response = await Client.SendAsync(request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions);
         var (cookie, setCookie) = ReadRefreshCookie(response);

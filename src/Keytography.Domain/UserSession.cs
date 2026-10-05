@@ -10,6 +10,9 @@ public class UserSession
     public Guid Id { get; set; } = Guid.NewGuid();
     public required Guid UserId { get; set; }
 
+    /// <summary>Carimbo de seguranca do usuario no momento do login (ver <see cref="User.SecurityStamp"/>).</summary>
+    public required Guid SecurityStamp { get; set; }
+
     /// <summary>Hash do refresh token atual.</summary>
     public required string RefreshTokenHash { get; set; }
 
@@ -38,5 +41,11 @@ public enum SessionRevocationReason
     Logout,
     LogoutAll,
     PasswordReset,
-    ReuseDetected
+    ReuseDetected,
+
+    /// <summary>Novo login no mesmo navegador: a sessao do cookie anterior foi substituida.</summary>
+    Superseded,
+
+    /// <summary>Passou do teto de sessoes simultaneas por usuario: a mais antiga foi encerrada.</summary>
+    SessionLimit
 }

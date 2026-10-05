@@ -77,11 +77,63 @@ public class SessionConfigurationTests
     [InlineData("Sessions:RotationGraceSeconds", "0")]
     [InlineData("Sessions:RotationGraceSeconds", "-1")]
     [InlineData("Sessions:RotationGraceSeconds", "100000")]
+    [InlineData("Sessions:MaxSessionsPerUser", "0")]
+    [InlineData("Sessions:MaxSessionsPerUser", "101")]
     public void Invalid_session_settings_make_the_api_fail_at_startup(string key, string value)
     {
         using var factory = Factory((key, value));
 
         Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+    }
+
+    [Fact]
+    public async Task Exceeding_the_session_limit_ends_the_least_recently_used_session_and_its_dek()
+    {
+        using var factory = Factory(("Sessions:MaxSessionsPerUser", "3"));
+        var kit = new SessionTestKit(factory);
+        await kit.RegisterAsync("ana", "ana@example.com");
+        await kit.RegisterAsync("bia", "bia@example.com");
+        var bia = await kit.LoginAsync("bia"); // outro usuario: o teto e por usuario
+
+        var a = await kit.LoginAsync("ana");
+        factory.Time.Advance(TimeSpan.FromMinutes(1));
+        var b = await kit.LoginAsync("ana");
+        factory.Time.Advance(TimeSpan.FromMinutes(1));
+        var c = await kit.LoginAsync("ana");
+        factory.Time.Advance(TimeSpan.FromMinutes(1));
+        // "A" e usada de novo (refresh): deixa de ser a menos recente; a menos recente passa a ser "B".
+        (await kit.SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: a.RefreshCookie)).EnsureSuccessStatusCode();
+        factory.Time.Advance(TimeSpan.FromMinutes(1));
+
+        var d = await kit.LoginAsync("ana");
+
+        Assert.Equal(SessionRevocationReason.SessionLimit, (await kit.LoadSessionAsync(b.SessionId)).RevokedReason);
+        Assert.Null(factory.DekCache.Get(b.SessionId));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await kit.MeAsync(b)).StatusCode);
+        foreach (var kept in new[] { a, c, d })
+        {
+            Assert.Null((await kit.LoadSessionAsync(kept.SessionId)).RevokedAt);
+            Assert.NotNull(factory.DekCache.Get(kept.SessionId));
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(bia)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_session_that_replaces_the_one_of_the_cookie_does_not_count_twice_toward_the_limit()
+    {
+        using var factory = Factory(("Sessions:MaxSessionsPerUser", "2"));
+        var kit = new SessionTestKit(factory);
+        await kit.RegisterAsync("ana", "ana@example.com");
+        var other = await kit.LoginAsync("ana");
+        var browser = await kit.LoginAsync("ana");
+
+        // Re-login no mesmo navegador: substitui a sessao do cookie, sem encerrar a "other" por teto.
+        var relogin = await kit.LoginAsync("ana", browser.RefreshCookie);
+
+        Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(other)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(relogin)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await kit.MeAsync(browser)).StatusCode);
     }
 
     [Fact]

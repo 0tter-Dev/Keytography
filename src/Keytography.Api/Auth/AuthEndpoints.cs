@@ -83,15 +83,15 @@ public static class AuthEndpoints
         // Geracao da DEK e das duas copias cifradas conforme ADR-0001. Feito aqui porque
         // a senha em texto puro so existe neste momento (e no login); apos autenticado via
         // JWT, o servidor nunca mais a ve.
-        var dek = RandomNumberGenerator.GetBytes(AesGcmCipher.KeySizeBytes);
+        using var dek = new SecretBytes(RandomNumberGenerator.GetBytes(AesGcmCipher.KeySizeBytes));
         var salt = Argon2IdKdf.GenerateSalt();
-        var ownerKey = Argon2IdKdf.DeriveKey(password, salt);
+        using var ownerKey = new SecretBytes(Argon2IdKdf.DeriveKey(password, salt));
         db.VaultKeys.Add(new VaultKey
         {
             UserId = user.Id,
             Argon2Salt = salt,
-            OwnerWrappedDek = AesGcmCipher.Encrypt(ownerKey, dek),
-            RecoveryWrappedDek = RsaEnvelope.Wrap(recoveryKeyProvider.Key, dek)
+            OwnerWrappedDek = AesGcmCipher.Encrypt(ownerKey.Value, dek.Value),
+            RecoveryWrappedDek = RsaEnvelope.Wrap(recoveryKeyProvider.Key, dek.Value)
         });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -157,18 +157,29 @@ public static class AuthEndpoints
         // Desfaz a DEK usando a copia "do dono" (unica vez em que a senha em texto puro
         // esta disponivel); ela fica em cache em memoria, atrelada a sessao criada abaixo,
         // para as operacoes de cofre (ADR-0001, ADR-0002 e ADR-0006).
-        byte[]? dek = null;
-        var vaultKey = await db.VaultKeys.FirstOrDefaultAsync(k => k.UserId == user.Id, cancellationToken);
-        if (vaultKey is not null)
-        {
-            var ownerKey = Argon2IdKdf.DeriveKey(password, vaultKey.Argon2Salt);
-            dek = AesGcmCipher.Decrypt(ownerKey, vaultKey.OwnerWrappedDek);
-        }
+        using var dek = await UnwrapOwnerDekAsync(db, user.Id, password, cancellationToken);
 
-        var issued = await sessions.CreateAsync(user, dek, cancellationToken);
+        // O cookie de refresh que o navegador enviou (Path=/auth cobre este endpoint) pertence a
+        // uma sessao que o cookie novo vai sobrescrever: ela e substituida, nao deixada orfa.
+        httpContext.Request.Cookies.TryGetValue(SessionService.RefreshCookieName, out var previousRefreshToken);
+        var issued = await sessions.CreateAsync(user, dek?.Value, previousRefreshToken, cancellationToken);
         sessions.WriteRefreshCookie(httpContext, issued.RefreshToken, issued.Session);
 
         return Results.Ok(new LoginResponse(issued.AccessToken, issued.AccessTokenExpiresAt));
+    }
+
+    /// <summary>Desfaz a DEK pela copia "do dono" (chave derivada da senha); null se o usuario nao tem chave de cofre.</summary>
+    private static async Task<SecretBytes?> UnwrapOwnerDekAsync(
+        KeytographyDbContext db, Guid userId, string password, CancellationToken cancellationToken)
+    {
+        var vaultKey = await db.VaultKeys.FirstOrDefaultAsync(k => k.UserId == userId, cancellationToken);
+        if (vaultKey is null)
+        {
+            return null;
+        }
+
+        using var ownerKey = new SecretBytes(Argon2IdKdf.DeriveKey(password, vaultKey.Argon2Salt));
+        return new SecretBytes(AesGcmCipher.Decrypt(ownerKey.Value, vaultKey.OwnerWrappedDek));
     }
 
     /// <summary>
@@ -305,11 +316,11 @@ public static class AuthEndpoints
         // Desfaz a DEK pela copia de recuperacao (chave RSA do sistema) e gera uma nova
         // copia "do dono" cifrada com a chave derivada da nova senha - o mesmo material de
         // DEK e preservado, entao o conteudo ja cifrado do cofre continua legivel (ADR-0001).
-        var dek = RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek);
+        using var dek = new SecretBytes(RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek));
         var newSalt = Argon2IdKdf.GenerateSalt();
-        var newOwnerKey = Argon2IdKdf.DeriveKey(newPassword, newSalt);
+        using var newOwnerKey = new SecretBytes(Argon2IdKdf.DeriveKey(newPassword, newSalt));
         vaultKey.Argon2Salt = newSalt;
-        vaultKey.OwnerWrappedDek = AesGcmCipher.Encrypt(newOwnerKey, dek);
+        vaultKey.OwnerWrappedDek = AesGcmCipher.Encrypt(newOwnerKey.Value, dek.Value);
 
         db.UserPasswordHistories.Add(new UserPasswordHistory
         {
@@ -317,6 +328,9 @@ public static class AuthEndpoints
             PasswordHash = user.PasswordHash
         });
         user.PasswordHash = PasswordHasher.Hash(newPassword);
+        // Renova o carimbo de seguranca: invalida tambem sessoes criadas por um login concorrente
+        // que ja tinha verificado a senha antiga (a lista abaixo nao as enxerga).
+        user.SecurityStamp = Guid.NewGuid();
         token.UsedAt = DateTimeOffset.UtcNow;
 
         // A credencial mudou: nenhuma sessao aberta com a senha antiga continua valendo. A

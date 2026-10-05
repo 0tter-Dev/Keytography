@@ -544,6 +544,106 @@ public class SessionTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await MeAsync(login)).StatusCode);
     }
 
+    // --- novo login no mesmo navegador (substituicao) ---------------------------------------------
+
+    [Fact]
+    public async Task Logging_in_again_with_the_previous_cookie_supersedes_that_session_and_its_dek()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var first = await LoginAsync("ana");
+        Assert.NotNull(_factory.DekCache.Get(first.SessionId));
+
+        var second = await _kit.LoginAsync("ana", refreshCookie: first.RefreshCookie);
+
+        var old = await LoadSessionAsync(first.SessionId);
+        Assert.Equal(SessionRevocationReason.Superseded, old.RevokedReason);
+        Assert.Null(_factory.DekCache.Get(first.SessionId));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(first)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: first.RefreshCookie)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(second)).StatusCode);
+        Assert.NotNull(_factory.DekCache.Get(second.SessionId));
+    }
+
+    [Fact]
+    public async Task Logging_in_as_another_user_with_the_cookie_of_the_previous_one_supersedes_the_old_session()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        await RegisterAsync("bia", "bia@example.com");
+        var ana = await LoginAsync("ana");
+
+        var bia = await _kit.LoginAsync("bia", refreshCookie: ana.RefreshCookie);
+
+        Assert.Equal(SessionRevocationReason.Superseded, (await LoadSessionAsync(ana.SessionId)).RevokedReason);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(ana)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(bia)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Logging_in_without_a_cookie_or_with_an_unknown_one_leaves_other_sessions_alone()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var first = await LoginAsync("ana");
+
+        var withoutCookie = await LoginAsync("ana");
+        var unknownCookie = await _kit.LoginAsync("ana", refreshCookie: "desconhecido");
+
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(first)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(withoutCookie)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(unknownCookie)).StatusCode);
+    }
+
+    // --- carimbo de seguranca (SecurityStamp) ------------------------------------------------------
+
+    [Fact]
+    public async Task A_session_created_by_a_login_that_started_before_a_password_reset_is_never_valid()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+        var sessions = scope.ServiceProvider.GetRequiredService<SessionService>();
+        // O login le o usuario (e o carimbo) ANTES de verificar a senha e derivar a DEK...
+        var userAsReadByTheLogin = await db.Users.SingleAsync(u => u.Login == "ana");
+
+        // ...e, nesse intervalo, o reset de senha conclui (troca a senha e renova o carimbo).
+        await _kit.Client.PostAsJsonAsync("/auth/forgot-password", new ForgotPasswordRequest("ana@example.com"));
+        var resetToken = AuthTestHelper.ExtractToken(
+            _factory.EmailSender.SentEmails.Last(e => e.Subject.Contains("Redefinição")).Body);
+        Assert.Equal(HttpStatusCode.OK,
+            (await _kit.Client.PostAsJsonAsync("/auth/reset-password", new ResetPasswordRequest(resetToken, "nova-senha-123"))).StatusCode);
+
+        // Esse login, que usou a senha antiga, so cria a sessao agora: depois da listagem de revogacao.
+        var issued = await sessions.CreateAsync(userAsReadByTheLogin, dek: null, previousRefreshToken: null, CancellationToken.None);
+
+        Assert.Null((await LoadSessionAsync(issued.Session.Id)).RevokedAt); // a revogacao em lote nao a enxergou...
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, "/auth/me", issued.AccessToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: issued.RefreshToken)).StatusCode); // ...mas o carimbo a derruba
+    }
+
+    [Fact]
+    public async Task Completing_a_password_reset_renews_the_security_stamp_of_the_user()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        async Task<Guid> StampAsync()
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+            return await db.Users.Where(u => u.Id == login.UserId).Select(u => u.SecurityStamp).SingleAsync();
+        }
+
+        var before = await StampAsync();
+        Assert.Equal(before, (await LoadSessionAsync(login.SessionId)).SecurityStamp);
+
+        await _kit.Client.PostAsJsonAsync("/auth/forgot-password", new ForgotPasswordRequest("ana@example.com"));
+        var resetToken = AuthTestHelper.ExtractToken(
+            _factory.EmailSender.SentEmails.Last(e => e.Subject.Contains("Redefinição")).Body);
+        await _kit.Client.PostAsJsonAsync("/auth/reset-password", new ResetPasswordRequest(resetToken, "nova-senha-123"));
+
+        Assert.NotEqual(before, await StampAsync());
+    }
+
     // --- CSRF e CORS ---------------------------------------------------------------------------
 
     [Theory]

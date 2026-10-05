@@ -13,6 +13,7 @@ public class SessionLifetimeOptions
     private const int MaxIdleHours = 24 * 30;
     private const int MaxAbsoluteDays = 365;
     private const int MaxRotationGraceSeconds = 300;
+    private const int MaxSessionsPerUserLimit = 100;
 
     /// <summary>Vida do access token (JWT). Curto: a sessao e quem manda, o JWT so a representa.</summary>
     public int AccessTokenMinutes { get; set; } = 15;
@@ -35,6 +36,13 @@ public class SessionLifetimeOptions
     /// </summary>
     public bool ForceSecureCookie { get; set; }
 
+    /// <summary>
+    /// Teto de sessoes ativas simultaneas por usuario. Ao criar uma nova alem dele, a sessao
+    /// menos recentemente usada e encerrada. Um novo login no mesmo navegador ja substitui a
+    /// sessao do cookie anterior; este teto limita varios dispositivos/navegadores.
+    /// </summary>
+    public int MaxSessionsPerUser { get; set; } = 10;
+
     public TimeSpan AccessTokenLifetime => TimeSpan.FromMinutes(AccessTokenMinutes);
     public TimeSpan IdleLifetime => TimeSpan.FromHours(IdleHours);
     public TimeSpan AbsoluteLifetime => TimeSpan.FromDays(AbsoluteDays);
@@ -46,12 +54,14 @@ public class SessionLifetimeOptions
         if (AccessTokenMinutes is < 1 or > MaxAccessTokenMinutes
             || IdleHours is < 1 or > MaxIdleHours
             || AbsoluteDays is < 1 or > MaxAbsoluteDays
-            || RotationGraceSeconds is < 1 or > MaxRotationGraceSeconds)
+            || RotationGraceSeconds is < 1 or > MaxRotationGraceSeconds
+            || MaxSessionsPerUser is < 1 or > MaxSessionsPerUserLimit)
         {
             throw new InvalidOperationException(
                 $"Sessions inválido: AccessTokenMinutes deve ficar entre 1 e {MaxAccessTokenMinutes}, " +
-                $"IdleHours entre 1 e {MaxIdleHours}, AbsoluteDays entre 1 e {MaxAbsoluteDays} " +
-                $"e RotationGraceSeconds entre 1 e {MaxRotationGraceSeconds}.");
+                $"IdleHours entre 1 e {MaxIdleHours}, AbsoluteDays entre 1 e {MaxAbsoluteDays}, " +
+                $"RotationGraceSeconds entre 1 e {MaxRotationGraceSeconds} " +
+                $"e MaxSessionsPerUser entre 1 e {MaxSessionsPerUserLimit}.");
         }
     }
 }

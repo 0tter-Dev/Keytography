@@ -36,6 +36,8 @@ O front matter completo, a concordância entre pasta e `status`, as seções obr
 
 Um plano ativo aprovado pelo usuário autoriza a sequência de entrega documentada: branch, implementação, validação, Conventional Commit, push, e pull request. Ele vira `review` naquele PR, e `completed` só depois do merge. A branch segue `<type>/<id>-<slug>` com o `type` do plano; o fechamento (`chore/close-<id>`) também apaga as branches locais já mergeadas, depois do merge real (ver [DEVELOPMENT-GUIDE.md](../DEVELOPMENT-GUIDE.md#nomes-de-branches-prs-e-planos)).
 
+**Verificações manuais:** o resultado de toda verificação manual listada em `Validation` (o que foi executado e o que se observou) é registrado no `Outcome` ao fechar o plano. Quando o roteiro for repetível, ele vive em um guia (por exemplo, a seção "Verificando as sessões com curl" de [running-locally.md](../guides/running-locally.md)) e o plano o referencia, para que auditorias e mudanças futuras o repitam.
+
 ## Pre-Merge Audit
 
 A `project-audit` roda como portão antes do merge de entregas relevantes. A decisão de **como** executá-la é uma configuração do projeto, lida pela skill desta linha:
