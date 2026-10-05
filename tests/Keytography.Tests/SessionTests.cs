@@ -376,6 +376,9 @@ public class SessionTests : IDisposable
 
         Assert.Equal(HttpStatusCode.Unauthorized, revoked.StatusCode);
         Assert.Equal(await unknown.Content.ReadAsStringAsync(), await revoked.Content.ReadAsStringAsync());
+        // Um 401 de refresh nunca mexe no cookie: uma resposta antiga nao pode apagar o cookie de um login novo.
+        Assert.Null(ReadRefreshCookie(revoked).Raw);
+        Assert.Null(ReadRefreshCookie(unknown).Raw);
     }
 
     [Fact]
@@ -593,10 +596,34 @@ public class SessionTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await MeAsync(unknownCookie)).StatusCode);
     }
 
+    [Fact]
+    public async Task A_refused_login_never_supersedes_the_session_of_the_cookie()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var session = await LoginAsync("ana");
+        // Cadastrada, mas sem verificar o e-mail.
+        (await _kit.Client.PostAsJsonAsync("/auth/register", new RegisterRequest("bia", "bia@example.com", SessionTestKit.Password))).EnsureSuccessStatusCode();
+
+        async Task<HttpStatusCode> LoginWithCookieAsync(string login, string password)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, "/auth/login") { Content = JsonContent.Create(new LoginRequest(login, password)) };
+            request.Headers.Add("Cookie", $"{SessionService.RefreshCookieName}={session.RefreshCookie}");
+            return (await _kit.Client.SendAsync(request)).StatusCode;
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, await LoginWithCookieAsync("ana", "senha-errada-123"));
+        Assert.Equal(HttpStatusCode.Unauthorized, await LoginWithCookieAsync("ninguem", "qualquer-senha-1"));
+        Assert.Equal(HttpStatusCode.Forbidden, await LoginWithCookieAsync("bia", SessionTestKit.Password));
+
+        Assert.Null((await LoadSessionAsync(session.SessionId)).RevokedAt);
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(session)).StatusCode);
+        Assert.NotNull(_factory.DekCache.Get(session.SessionId));
+    }
+
     // --- carimbo de seguranca (SecurityStamp) ------------------------------------------------------
 
     [Fact]
-    public async Task A_session_created_by_a_login_that_started_before_a_password_reset_is_never_valid()
+    public async Task A_login_that_loses_the_race_against_a_password_reset_is_refused_and_leaves_no_active_session_or_dek()
     {
         await RegisterAsync("ana", "ana@example.com");
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -613,12 +640,56 @@ public class SessionTests : IDisposable
             (await _kit.Client.PostAsJsonAsync("/auth/reset-password", new ResetPasswordRequest(resetToken, "nova-senha-123"))).StatusCode);
 
         // Esse login, que usou a senha antiga, so cria a sessao agora: depois da listagem de revogacao.
-        var issued = await sessions.CreateAsync(userAsReadByTheLogin, dek: null, previousRefreshToken: null, CancellationToken.None);
+        var issued = await sessions.CreateAsync(userAsReadByTheLogin, new byte[32], previousRefreshToken: null, CancellationToken.None);
 
-        Assert.Null((await LoadSessionAsync(issued.Session.Id)).RevokedAt); // a revogacao em lote nao a enxergou...
-        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, "/auth/me", issued.AccessToken)).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized,
-            (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: issued.RefreshToken)).StatusCode); // ...mas o carimbo a derruba
+        // O carimbo mudou: nenhum token e devolvido, a sessao nasce encerrada e nenhuma DEK fica em memoria.
+        Assert.Null(issued);
+        var orphan = await db.UserSessions.AsNoTracking().SingleAsync(s => s.UserId == userAsReadByTheLogin.Id);
+        Assert.Equal(SessionRevocationReason.PasswordReset, orphan.RevokedReason);
+        Assert.Null(_factory.DekCache.Get(orphan.Id));
+    }
+
+    [Fact]
+    public async Task A_session_with_a_stale_stamp_found_later_is_revoked_with_its_dek_on_first_use()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var userId = (await _kit.LoginAsync("ana")).UserId;
+        var staleBearer = await InsertStaleSessionAsync(userId, refreshToken: null);
+        var staleRefresh = await InsertStaleSessionAsync(userId, refreshToken: "refresh-de-sessao-com-carimbo-antigo");
+
+        // Access token: recusado e a sessao encerrada de vez (com a DEK).
+        var token = ForgeAccessToken(userId, staleBearer, DateTime.UtcNow.AddMinutes(5));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(HttpMethod.Get, "/auth/me", token)).StatusCode);
+        Assert.Equal(SessionRevocationReason.PasswordReset, (await LoadSessionAsync(staleBearer)).RevokedReason);
+        Assert.Null(_factory.DekCache.Get(staleBearer));
+
+        // Refresh: recusado e a sessao encerrada de vez (com a DEK).
+        var refresh = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: "refresh-de-sessao-com-carimbo-antigo");
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+        Assert.Equal(SessionRevocationReason.PasswordReset, (await LoadSessionAsync(staleRefresh)).RevokedReason);
+        Assert.Null(_factory.DekCache.Get(staleRefresh));
+    }
+
+    private async Task<Guid> InsertStaleSessionAsync(Guid userId, string? refreshToken)
+    {
+        var now = _factory.Time.GetUtcNow();
+        var hashSource = refreshToken ?? Guid.NewGuid().ToString();
+        var session = new UserSession
+        {
+            UserId = userId,
+            SecurityStamp = Guid.NewGuid(), // nao e o carimbo atual do usuario
+            RefreshTokenHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(hashSource))),
+            CreatedAt = now,
+            LastRefreshedAt = now,
+            IdleExpiresAt = now.AddHours(12),
+            AbsoluteExpiresAt = now.AddDays(7)
+        };
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+        db.UserSessions.Add(session);
+        await db.SaveChangesAsync();
+        _factory.DekCache.Set(session.Id, new byte[32], TimeSpan.FromHours(12));
+        return session.Id;
     }
 
     [Fact]

@@ -63,15 +63,24 @@ public class SessionService
     /// Cookie de refresh que o navegador enviou no login, se houver: a sessao dele e substituida
     /// (um navegador tem uma sessao so; o cookie novo sobrescreve o antigo, que ficaria orfao).
     /// </param>
-    public async Task<IssuedSession> CreateAsync(
+    /// <returns>
+    /// A sessao e os tokens, ou <c>null</c> se o carimbo de seguranca do usuario mudou entre a
+    /// leitura e a criacao (uma troca de senha concluiu no meio do login): a sessao nasce revogada.
+    /// </returns>
+    public async Task<IssuedSession?> CreateAsync(
         User user, byte[]? dek, string? previousRefreshToken, CancellationToken cancellationToken)
     {
         var now = _time.GetUtcNow();
         await RemoveStaleSessionsAsync(now, cancellationToken);
 
-        if (await FindByRefreshTokenAsync(previousRefreshToken, cancellationToken) is { } previous)
+        // A substituicao entra na MESMA transacao do insert da sessao nova: se o insert falhar, o
+        // usuario nao perde a sessao anterior sem ganhar a nova.
+        Guid? supersededId = null;
+        if (await FindTrackedByRefreshTokenAsync(previousRefreshToken, cancellationToken) is { RevokedAt: null } previous)
         {
-            await RevokeAsync(previous.Id, SessionRevocationReason.Superseded, cancellationToken);
+            previous.RevokedAt = now;
+            previous.RevokedReason = SessionRevocationReason.Superseded;
+            supersededId = previous.Id;
         }
 
         var refreshToken = NewRefreshToken();
@@ -89,7 +98,23 @@ public class SessionService
         _db.UserSessions.Add(session);
         await _db.SaveChangesAsync(cancellationToken);
 
-        await EnforceSessionLimitAsync(user.Id, session.Id, now, cancellationToken);
+        if (supersededId is { } superseded)
+        {
+            _dekCache.Remove(superseded);
+        }
+
+        // Se o reset de senha concluiu depois de lermos o usuario (e antes de a sessao existir), a
+        // revogacao em lote nao a enxerga: o carimbo a invalida, e aqui ela ja nasce encerrada, sem
+        // deixar DEK em memoria nem devolver tokens.
+        var stampStillValid = await _db.Users.AsNoTracking()
+            .AnyAsync(u => u.Id == user.Id && u.SecurityStamp == user.SecurityStamp, cancellationToken);
+        if (!stampStillValid)
+        {
+            await RevokeAsync(session.Id, SessionRevocationReason.PasswordReset, cancellationToken);
+            return null;
+        }
+
+        await EnforceSessionLimitAsync(user, session.Id, now, cancellationToken);
 
         if (dek is not null)
         {
@@ -132,9 +157,15 @@ public class SessionService
             }
 
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == session.UserId, cancellationToken);
-            // Credenciais mudaram desde o login (troca de senha): a sessao nao vale mais.
-            if (user is null || !user.EmailVerified || user.SecurityStamp != session.SecurityStamp)
+            if (user is null || !user.EmailVerified)
             {
+                return new RefreshResult(RefreshOutcome.Invalid);
+            }
+
+            // Credenciais mudaram desde o login (troca de senha): a sessao e encerrada de vez, com a DEK.
+            if (user.SecurityStamp != session.SecurityStamp)
+            {
+                await RevokeAsync(session.Id, SessionRevocationReason.PasswordReset, cancellationToken);
                 return new RefreshResult(RefreshOutcome.Invalid);
             }
 
@@ -293,12 +324,24 @@ public class SessionService
             select new { Session = s, UserStamp = u.SecurityStamp })
             .FirstOrDefaultAsync(cancellationToken);
 
-        // O carimbo precisa ser o mesmo do login: trocar a senha o renova e derruba a sessao.
-        return found is not null
-               && found.Session.SecurityStamp == found.UserStamp
-               && found.Session.IsActive(_time.GetUtcNow())
-            ? found.Session
-            : null;
+        if (found is null)
+        {
+            return null;
+        }
+
+        // O carimbo precisa ser o mesmo do login: trocar a senha o renova e derruba a sessao. Alem de
+        // recusar, encerra-a de vez (e remove a DEK), para nao deixar sessao orfa com chave em memoria.
+        if (found.Session.SecurityStamp != found.UserStamp)
+        {
+            if (found.Session.RevokedAt is null)
+            {
+                await RevokeAsync(sessionId, SessionRevocationReason.PasswordReset, cancellationToken);
+            }
+
+            return null;
+        }
+
+        return found.Session.IsActive(_time.GetUtcNow()) ? found.Session : null;
     }
 
     /// <summary>Sessao (qualquer estado) cujo refresh token atual ou anterior e o informado.</summary>
@@ -311,6 +354,19 @@ public class SessionService
 
         var hash = Hash(refreshToken);
         return await _db.UserSessions.AsNoTracking().FirstOrDefaultAsync(
+            s => s.RefreshTokenHash == hash || s.PreviousRefreshTokenHash == hash, cancellationToken);
+    }
+
+    /// <summary>Como <see cref="FindByRefreshTokenAsync"/>, mas rastreada pelo contexto (para alterar e salvar junto de outra mudanca).</summary>
+    private async Task<UserSession?> FindTrackedByRefreshTokenAsync(string? refreshToken, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return null;
+        }
+
+        var hash = Hash(refreshToken);
+        return await _db.UserSessions.FirstOrDefaultAsync(
             s => s.RefreshTokenHash == hash || s.PreviousRefreshTokenHash == hash, cancellationToken);
     }
 
@@ -342,19 +398,21 @@ public class SessionService
     }
 
     /// <summary>
-    /// Teto de sessoes simultaneas por usuario (<c>Sessions:MaxPerUser</c>): ao passar dele, as mais
-    /// antigas (pelo ultimo uso) sao encerradas. A sessao recem-criada nunca e a escolhida.
+    /// Teto de sessoes simultaneas por usuario, por perfil (<c>Sessions:MaxSessionsPerMember</c> e
+    /// <c>Sessions:MaxSessionsPerAdmin</c>): ao passar dele, as mais antigas (pelo ultimo uso) sao
+    /// encerradas. A sessao recem-criada nunca e a escolhida; expiradas e revogadas nao contam.
     /// </summary>
-    private async Task EnforceSessionLimitAsync(Guid userId, Guid newSessionId, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task EnforceSessionLimitAsync(User user, Guid newSessionId, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        var limit = _options.SessionLimitFor(user.Role);
         var others = await _db.UserSessions
-            .Where(s => s.UserId == userId && s.Id != newSessionId && s.RevokedAt == null
+            .Where(s => s.UserId == user.Id && s.Id != newSessionId && s.RevokedAt == null
                         && s.IdleExpiresAt > now && s.AbsoluteExpiresAt > now)
             .OrderBy(s => s.LastRefreshedAt)
             .Select(s => s.Id)
             .ToListAsync(cancellationToken);
 
-        foreach (var oldest in others.Take(Math.Max(0, others.Count - (_options.MaxSessionsPerUser - 1))))
+        foreach (var oldest in others.Take(Math.Max(0, others.Count - (limit - 1))))
         {
             await RevokeAsync(oldest, SessionRevocationReason.SessionLimit, cancellationToken);
         }

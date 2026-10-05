@@ -49,6 +49,10 @@ public class KeytographyDbContext : DbContext
             entity.HasIndex(s => s.UserId);
             entity.HasIndex(s => s.RefreshTokenHash);
             entity.HasIndex(s => s.PreviousRefreshTokenHash);
+            // Consulta de limpeza de sessoes encerradas (a cada login) e de contagem para o teto.
+            entity.HasIndex(s => s.RevokedAt);
+            entity.HasIndex(s => s.IdleExpiresAt);
+            entity.HasIndex(s => s.AbsoluteExpiresAt);
             entity.Property(s => s.RevokedReason).HasConversion<string>();
 
             // SQLite nao compara DateTimeOffset no banco; guardar como ticks UTC (inteiro)

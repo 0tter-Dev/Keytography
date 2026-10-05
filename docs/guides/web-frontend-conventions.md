@@ -105,6 +105,8 @@ A preferência é persistida em `localStorage` (`keytography.appearance`); `inde
 
 ## Sessão e rotas protegidas
 
+> **Nota de transição (`keytography-016`):** a API passou a gerenciar as sessões (access token de 15 minutos, refresh por cookie `HttpOnly`, logout real; [ADR-0006](../decisions/ADR-0006-backend-managed-sessions.md)). As regras abaixo descrevem o cliente atual (JWT em `sessionStorage`, logout local) e serão reescritas pelo `keytography-017`; até lá, a interface volta ao login a cada 15 minutos.
+
 - A sessão (JWT + `expiresAt`) vive em `features/auth/session-store.ts`, persistida em **`sessionStorage`** — não em `localStorage` — de propósito: é um cofre de senhas e o token deve sumir com a aba (decisão e direção futura no [ADR-0005](../decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md)). Não guarde o token em outro lugar nem o copie para estado de componente.
 - Quem precisa estar logado fica sob a rota `RequireAuth` (`features/auth/guards.tsx`); telas só para visitantes ficam sob `GuestOnly`. Rotas novas entram em `app/routes.tsx`.
 - Chamadas à API usam sempre o cliente tipado: ele anexa o `Authorization` (menos nos endpoints anônimos, listados em `api/client.ts` — um endpoint anônimo novo entra nessa lista) e trata o 401 (encerra a sessão). Não monte o cabeçalho à mão.

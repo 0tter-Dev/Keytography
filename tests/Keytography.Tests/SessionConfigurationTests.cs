@@ -77,8 +77,10 @@ public class SessionConfigurationTests
     [InlineData("Sessions:RotationGraceSeconds", "0")]
     [InlineData("Sessions:RotationGraceSeconds", "-1")]
     [InlineData("Sessions:RotationGraceSeconds", "100000")]
-    [InlineData("Sessions:MaxSessionsPerUser", "0")]
-    [InlineData("Sessions:MaxSessionsPerUser", "101")]
+    [InlineData("Sessions:MaxSessionsPerMember", "0")]
+    [InlineData("Sessions:MaxSessionsPerMember", "101")]
+    [InlineData("Sessions:MaxSessionsPerAdmin", "0")]
+    [InlineData("Sessions:MaxSessionsPerAdmin", "101")]
     public void Invalid_session_settings_make_the_api_fail_at_startup(string key, string value)
     {
         using var factory = Factory((key, value));
@@ -89,7 +91,7 @@ public class SessionConfigurationTests
     [Fact]
     public async Task Exceeding_the_session_limit_ends_the_least_recently_used_session_and_its_dek()
     {
-        using var factory = Factory(("Sessions:MaxSessionsPerUser", "3"));
+        using var factory = Factory(("Sessions:MaxSessionsPerAdmin", "3"));
         var kit = new SessionTestKit(factory);
         await kit.RegisterAsync("ana", "ana@example.com");
         await kit.RegisterAsync("bia", "bia@example.com");
@@ -122,7 +124,7 @@ public class SessionConfigurationTests
     [Fact]
     public async Task A_session_that_replaces_the_one_of_the_cookie_does_not_count_twice_toward_the_limit()
     {
-        using var factory = Factory(("Sessions:MaxSessionsPerUser", "2"));
+        using var factory = Factory(("Sessions:MaxSessionsPerAdmin", "2"));
         var kit = new SessionTestKit(factory);
         await kit.RegisterAsync("ana", "ana@example.com");
         var other = await kit.LoginAsync("ana");
@@ -134,6 +136,97 @@ public class SessionConfigurationTests
         Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(other)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(relogin)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await kit.MeAsync(browser)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Members_and_admins_have_their_own_session_limits()
+    {
+        using var factory = Factory(("Sessions:MaxSessionsPerMember", "2"), ("Sessions:MaxSessionsPerAdmin", "3"));
+        var kit = new SessionTestKit(factory);
+        await kit.RegisterAsync("root", "root@example.com"); // o primeiro usuario cadastrado e Admin
+        await kit.RegisterAsync("bia", "bia@example.com");   // os seguintes sao Member
+
+        var admin = new[] { await kit.LoginAsync("root"), await kit.LoginAsync("root"), await kit.LoginAsync("root") };
+        var member = new[] { await kit.LoginAsync("bia"), await kit.LoginAsync("bia"), await kit.LoginAsync("bia") };
+
+        // Admin: 3 sessoes cabem no teto 3; Member: a terceira passou do teto 2 e encerrou a primeira.
+        Assert.All(admin, s => Assert.Equal(HttpStatusCode.OK, kit.MeAsync(s).GetAwaiter().GetResult().StatusCode));
+        Assert.Equal(SessionRevocationReason.SessionLimit, (await kit.LoadSessionAsync(member[0].SessionId)).RevokedReason);
+        Assert.Null(factory.DekCache.Get(member[0].SessionId));
+        Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(member[1])).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await kit.MeAsync(member[2])).StatusCode);
+    }
+
+    [Fact]
+    public async Task Default_limits_are_5_sessions_for_a_member_and_10_for_an_admin()
+    {
+        using var factory = new ApiFactory();
+        var kit = new SessionTestKit(factory);
+        await kit.RegisterAsync("root", "root@example.com");
+        await kit.RegisterAsync("bia", "bia@example.com");
+
+        var members = new List<SessionTestKit.Login>();
+        for (var i = 0; i < 6; i++)
+        {
+            members.Add(await kit.LoginAsync("bia"));
+            factory.Time.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        var admins = new List<SessionTestKit.Login>();
+        for (var i = 0; i < 11; i++)
+        {
+            admins.Add(await kit.LoginAsync("root"));
+            factory.Time.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.NotNull((await kit.LoadSessionAsync(members[0].SessionId)).RevokedAt);
+        Assert.All(members.Skip(1), m => Assert.Null(kit.LoadSessionAsync(m.SessionId).GetAwaiter().GetResult().RevokedAt));
+        Assert.NotNull((await kit.LoadSessionAsync(admins[0].SessionId)).RevokedAt);
+        Assert.All(admins.Skip(1), a => Assert.Null(kit.LoadSessionAsync(a.SessionId).GetAwaiter().GetResult().RevokedAt));
+    }
+
+    [Fact]
+    public async Task Expired_sessions_do_not_count_toward_the_limit()
+    {
+        using var factory = Factory(("Sessions:MaxSessionsPerAdmin", "2"));
+        var kit = new SessionTestKit(factory);
+        await kit.RegisterAsync("ana", "ana@example.com"); // Admin
+        var expired = await kit.LoginAsync("ana");
+        factory.Time.Advance(TimeSpan.FromHours(13)); // a primeira expirou por inatividade
+
+        var second = await kit.LoginAsync("ana");
+        var third = await kit.LoginAsync("ana");
+
+        // Teto 2: so a "second" conta contra a "third"; nada foi encerrado por teto.
+        Assert.Null((await kit.LoadSessionAsync(second.SessionId)).RevokedAt);
+        Assert.Null((await kit.LoadSessionAsync(third.SessionId)).RevokedAt);
+        Assert.Null((await kit.LoadSessionAsync(expired.SessionId)).RevokedReason);
+    }
+
+    [Fact]
+    public async Task Concurrent_logins_never_exceed_the_limit_and_always_leave_a_session_for_the_user()
+    {
+        using var factory = Factory(("Sessions:MaxSessionsPerAdmin", "2"));
+        var kit = new SessionTestKit(factory);
+        await kit.RegisterAsync("ana", "ana@example.com");
+
+        for (var round = 0; round < 3; round++)
+        {
+            var logins = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => kit.LoginAsync("ana")));
+            factory.Time.Advance(TimeSpan.FromSeconds(1));
+
+            var active = 0;
+            foreach (var login in logins)
+            {
+                if ((await kit.LoadSessionAsync(login.SessionId)).RevokedAt is null)
+                {
+                    active++;
+                }
+            }
+
+            // Nunca acima do teto; e a falha segura (duas sessoes se encerrando) nunca zera o usuario aqui.
+            Assert.InRange(active, 1, 2);
+        }
     }
 
     [Fact]

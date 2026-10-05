@@ -163,6 +163,12 @@ public static class AuthEndpoints
         // uma sessao que o cookie novo vai sobrescrever: ela e substituida, nao deixada orfa.
         httpContext.Request.Cookies.TryGetValue(SessionService.RefreshCookieName, out var previousRefreshToken);
         var issued = await sessions.CreateAsync(user, dek?.Value, previousRefreshToken, cancellationToken);
+        if (issued is null)
+        {
+            // A senha foi trocada enquanto este login acontecia: as credenciais enviadas ja nao valem.
+            return Results.Unauthorized();
+        }
+
         sessions.WriteRefreshCookie(httpContext, issued.RefreshToken, issued.Session);
 
         return Results.Ok(new LoginResponse(issued.AccessToken, issued.AccessTokenExpiresAt));
@@ -202,7 +208,9 @@ public static class AuthEndpoints
 
         if (result.Outcome is SessionService.RefreshOutcome.Invalid or SessionService.RefreshOutcome.ReuseDetected)
         {
-            sessions.ClearRefreshCookie(httpContext);
+            // Nao apaga o cookie: com varias abas, a resposta 401 de uma requisicao antiga pode chegar
+            // depois do Set-Cookie de um login novo e o apagaria. O cookie invalido e inofensivo e
+            // sai no logout ou na expiracao.
             return Results.Unauthorized();
         }
 
