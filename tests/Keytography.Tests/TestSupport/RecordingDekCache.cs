@@ -15,10 +15,14 @@ public class RecordingDekCache : IDekCache
     public List<(Guid SessionId, TimeSpan Ttl)> SetCalls { get; } = [];
     public List<Guid> RemoveCalls { get; } = [];
 
+    /// <summary>Executado logo depois de cada Set: permite simular um logout concorrente nesse instante.</summary>
+    public Action<Guid>? AfterSet { get; set; }
+
     public void Set(Guid sessionId, byte[] dek, TimeSpan ttl)
     {
         SetCalls.Add((sessionId, ttl));
         _inner.Set(sessionId, dek, ttl);
+        AfterSet?.Invoke(sessionId);
     }
 
     public byte[]? Get(Guid sessionId) => _inner.Get(sessionId);

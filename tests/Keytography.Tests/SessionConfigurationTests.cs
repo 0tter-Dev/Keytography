@@ -74,6 +74,7 @@ public class SessionConfigurationTests
     [InlineData("Sessions:IdleHours", "999999")]
     [InlineData("Sessions:AbsoluteDays", "0")]
     [InlineData("Sessions:AbsoluteDays", "1000000")]
+    [InlineData("Sessions:RotationGraceSeconds", "0")]
     [InlineData("Sessions:RotationGraceSeconds", "-1")]
     [InlineData("Sessions:RotationGraceSeconds", "100000")]
     public void Invalid_session_settings_make_the_api_fail_at_startup(string key, string value)

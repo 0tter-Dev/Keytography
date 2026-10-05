@@ -273,6 +273,87 @@ public class SessionTests : IDisposable
             (await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: currentCookie)).StatusCode);
     }
 
+    [Fact]
+    public async Task A_logout_that_lands_between_the_dek_renewal_and_its_check_does_not_leave_the_dek_in_memory()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+
+        // Simula o pior intercalamento: o logout revoga a sessao (e remove a DEK) ANTES de o refresh
+        // recolocar a DEK no cache - o Set do refresh "ressuscitaria" a DEK de uma sessao revogada.
+        _factory.DekCache.AfterSet = sessionId =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+            var now = _factory.Time.GetUtcNow();
+            db.UserSessions.Where(s => s.Id == sessionId)
+                .ExecuteUpdate(set => set.SetProperty(s => s.RevokedAt, (DateTimeOffset?)now));
+            _factory.DekCache.AfterSet = null;
+        };
+
+        var refresh = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
+
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+        Assert.NotNull((await LoadSessionAsync(login.SessionId)).RevokedAt);
+        Assert.Null(_factory.DekCache.Get(login.SessionId));
+    }
+
+    [Fact]
+    public async Task Concurrent_refresh_and_logout_always_end_with_a_revoked_session_and_no_dek()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+
+        for (var round = 0; round < 20; round++)
+        {
+            var login = await LoginAsync("ana");
+
+            await Task.WhenAll(
+                SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie),
+                SendAsync(HttpMethod.Post, "/auth/logout", refreshCookie: login.RefreshCookie),
+                SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie));
+
+            Assert.NotNull((await LoadSessionAsync(login.SessionId)).RevokedAt);
+            Assert.Null(_factory.DekCache.Get(login.SessionId));
+        }
+    }
+
+    [Fact]
+    public async Task Concurrent_reuse_of_an_old_token_after_the_grace_window_is_rejected_for_everyone_and_revokes_once()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
+        _factory.Time.Advance(TimeSpan.FromSeconds(11));
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+            SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie)));
+
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode));
+        var session = await LoadSessionAsync(login.SessionId);
+        Assert.Equal(SessionRevocationReason.ReuseDetected, session.RevokedReason);
+        Assert.Null(_factory.DekCache.Get(login.SessionId));
+    }
+
+    [Fact]
+    public async Task A_lost_refresh_response_costs_the_session_after_the_grace_window_but_never_grants_access()
+    {
+        // Documenta a limitacao do ADR-0006: o servidor rotacionou A para B, mas a resposta (e o
+        // cookie B) nunca chegou; o cliente segue repetindo com A.
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie); // resposta "perdida"
+
+        var retryWithinGrace = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
+        Assert.Equal(HttpStatusCode.OK, retryWithinGrace.StatusCode);
+        Assert.Null(NewCookieOf(retryWithinGrace));
+
+        _factory.Time.Advance(TimeSpan.FromSeconds(11));
+        var retryAfterGrace = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, retryAfterGrace.StatusCode);
+        Assert.NotNull((await LoadSessionAsync(login.SessionId)).RevokedAt);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("valor-que-nao-existe")]

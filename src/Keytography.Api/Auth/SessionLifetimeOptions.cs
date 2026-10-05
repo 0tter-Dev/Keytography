@@ -23,7 +23,10 @@ public class SessionLifetimeOptions
     /// <summary>Limite absoluto da sessao, mesmo com atividade continua.</summary>
     public int AbsoluteDays { get; set; } = 7;
 
-    /// <summary>Janela em que o refresh token anterior ainda e aceito, para requisicoes simultaneas.</summary>
+    /// <summary>
+    /// Janela em que o refresh token anterior ainda e aceito, para requisicoes simultaneas. Minimo 1 s:
+    /// com 0, refreshes simultaneos legitimos seriam tratados como reuso e derrubariam a sessao.
+    /// </summary>
     public int RotationGraceSeconds { get; set; } = 10;
 
     /// <summary>
@@ -43,12 +46,12 @@ public class SessionLifetimeOptions
         if (AccessTokenMinutes is < 1 or > MaxAccessTokenMinutes
             || IdleHours is < 1 or > MaxIdleHours
             || AbsoluteDays is < 1 or > MaxAbsoluteDays
-            || RotationGraceSeconds is < 0 or > MaxRotationGraceSeconds)
+            || RotationGraceSeconds is < 1 or > MaxRotationGraceSeconds)
         {
             throw new InvalidOperationException(
                 $"Sessions inválido: AccessTokenMinutes deve ficar entre 1 e {MaxAccessTokenMinutes}, " +
                 $"IdleHours entre 1 e {MaxIdleHours}, AbsoluteDays entre 1 e {MaxAbsoluteDays} " +
-                $"e RotationGraceSeconds entre 0 e {MaxRotationGraceSeconds}.");
+                $"e RotationGraceSeconds entre 1 e {MaxRotationGraceSeconds}.");
         }
     }
 }
