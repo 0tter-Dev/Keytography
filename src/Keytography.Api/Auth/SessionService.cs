@@ -106,9 +106,7 @@ public class SessionService
         // Se o reset de senha concluiu depois de lermos o usuario (e antes de a sessao existir), a
         // revogacao em lote nao a enxerga: o carimbo a invalida, e aqui ela ja nasce encerrada, sem
         // deixar DEK em memoria nem devolver tokens.
-        var stampStillValid = await _db.Users.AsNoTracking()
-            .AnyAsync(u => u.Id == user.Id && u.SecurityStamp == user.SecurityStamp, cancellationToken);
-        if (!stampStillValid)
+        if (!await IsStillValidAsync(session.Id, cancellationToken))
         {
             await RevokeAsync(session.Id, SessionRevocationReason.PasswordReset, cancellationToken);
             return null;
@@ -119,6 +117,16 @@ public class SessionService
         if (dek is not null)
         {
             _dekCache.Set(session.Id, dek, session.IdleExpiresAt - now);
+
+            // Um reset de senha pode ter concluido entre a conferencia acima e este Set: a revogacao
+            // em lote ja viu a sessao, mas o ForgetDeks dela rodou ANTES de a DEK entrar no cache e
+            // a deixaria em memoria. Reconferir depois do Set fecha a janela (ou o reset remove a DEK
+            // depois do Set, ou nos removemos aqui) e o login nao devolve tokens de uma sessao morta.
+            if (!await IsStillValidAsync(session.Id, cancellationToken))
+            {
+                await RevokeAsync(session.Id, SessionRevocationReason.PasswordReset, cancellationToken);
+                return null;
+            }
         }
 
         var (accessToken, accessExpiresAt) = IssueAccessToken(user, session, now);
@@ -231,6 +239,15 @@ public class SessionService
             _dekCache.Remove(session.Id);
         }
     }
+
+    /// <summary>A sessao existe, nao foi revogada e o carimbo dela ainda e o do usuario.</summary>
+    private async Task<bool> IsStillValidAsync(Guid sessionId, CancellationToken cancellationToken) =>
+        await (
+            from s in _db.UserSessions.AsNoTracking()
+            join u in _db.Users.AsNoTracking() on s.UserId equals u.Id
+            where s.Id == sessionId
+            select s.RevokedAt == null && u.SecurityStamp == s.SecurityStamp)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public (string Token, DateTimeOffset ExpiresAt) IssueAccessToken(User user, UserSession session, DateTimeOffset? now = null)
     {

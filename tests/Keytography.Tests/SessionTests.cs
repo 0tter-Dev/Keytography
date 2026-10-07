@@ -715,6 +715,68 @@ public class SessionTests : IDisposable
         Assert.NotEqual(before, await StampAsync());
     }
 
+    [Fact]
+    public async Task A_password_reset_that_completes_right_after_the_dek_is_cached_is_refused_and_leaves_no_dek()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        Guid userId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+            userId = await db.Users.Where(u => u.Login == "ana").Select(u => u.Id).SingleAsync();
+        }
+
+        // Simula o reset concluindo exatamente depois de a DEK do login entrar no cache: troca o carimbo e
+        // revoga as sessoes (o ForgetDeks do reset real ja rodou, antes de a DEK existir) - sem remover a DEK.
+        _factory.DekCache.AfterSet = _ =>
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+            var now = _factory.Time.GetUtcNow();
+            db.Users.Where(u => u.Id == userId).ExecuteUpdate(set => set.SetProperty(u => u.SecurityStamp, Guid.NewGuid()));
+            db.UserSessions.Where(s => s.UserId == userId).ExecuteUpdate(set => set
+                .SetProperty(s => s.RevokedAt, (DateTimeOffset?)now)
+                .SetProperty(s => s.RevokedReason, (SessionRevocationReason?)SessionRevocationReason.PasswordReset));
+            _factory.DekCache.AfterSet = null;
+        };
+
+        var response = await _kit.Client.PostAsJsonAsync("/auth/login", new LoginRequest("ana", SessionTestKit.Password));
+
+        // O login nao devolve tokens nem cookie de uma sessao morta, e a DEK nao fica em memoria.
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Null(ReadRefreshCookie(response).Raw);
+        await using var check = _factory.Services.CreateAsyncScope();
+        var session = await check.ServiceProvider.GetRequiredService<KeytographyDbContext>()
+            .UserSessions.AsNoTracking().SingleAsync(s => s.UserId == userId);
+        Assert.Equal(SessionRevocationReason.PasswordReset, session.RevokedReason);
+        Assert.Null(_factory.DekCache.Get(session.Id));
+    }
+
+    [Fact]
+    public async Task A_refresh_that_ends_in_401_never_sets_or_clears_the_cookie_in_any_branch()
+    {
+        await RegisterAsync("ana", "ana@example.com");
+        var login = await LoginAsync("ana");
+        var rotated = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
+        var current = NewCookieOf(rotated)!;
+
+        // Cookie ausente.
+        var noCookie = await SendAsync(HttpMethod.Post, "/auth/refresh");
+        Assert.Equal(HttpStatusCode.Unauthorized, noCookie.StatusCode);
+        Assert.Null(ReadRefreshCookie(noCookie).Raw);
+
+        // Reuso detectado (token antigo depois da tolerancia): 401 e nenhum Set-Cookie.
+        _factory.Time.Advance(TimeSpan.FromSeconds(11));
+        var reuse = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: login.RefreshCookie);
+        Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
+        Assert.Null(ReadRefreshCookie(reuse).Raw);
+
+        // Cookie ja revogado (pelo reuso acima): 401 e nenhum Set-Cookie.
+        var revoked = await SendAsync(HttpMethod.Post, "/auth/refresh", refreshCookie: current);
+        Assert.Equal(HttpStatusCode.Unauthorized, revoked.StatusCode);
+        Assert.Null(ReadRefreshCookie(revoked).Raw);
+    }
+
     // --- CSRF e CORS ---------------------------------------------------------------------------
 
     [Theory]

@@ -1,5 +1,10 @@
 using System.Net;
+using System.Net.Http.Json;
+using Keytography.Api.Auth;
 using Keytography.Domain;
+using Keytography.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Keytography.Tests.TestSupport;
 using static Keytography.Tests.TestSupport.SessionTestKit;
 
@@ -212,20 +217,22 @@ public class SessionConfigurationTests
 
         for (var round = 0; round < 3; round++)
         {
-            var logins = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => kit.LoginAsync("ana")));
+            // Um login pode receber 401 se outro login simultaneo encerrou a sessao dele pelo teto
+            // antes de ele terminar (limitacao registrada no ADR-0006); 5xx nunca.
+            var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
+                kit.Client.PostAsJsonAsync("/auth/login", new LoginRequest("ana", SessionTestKit.Password))));
+            Assert.All(responses, r => Assert.True(
+                r.StatusCode is HttpStatusCode.OK or HttpStatusCode.Unauthorized, $"Status inesperado: {r.StatusCode}"));
             factory.Time.Advance(TimeSpan.FromSeconds(1));
 
-            var active = 0;
-            foreach (var login in logins)
-            {
-                if ((await kit.LoadSessionAsync(login.SessionId)).RevokedAt is null)
-                {
-                    active++;
-                }
-            }
+            await using var scope = factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<KeytographyDbContext>();
+            var now = factory.Time.GetUtcNow();
+            var active = await db.UserSessions.CountAsync(s => s.RevokedAt == null && s.IdleExpiresAt > now);
 
             // Nunca acima do teto; e a falha segura (duas sessoes se encerrando) nunca zera o usuario aqui.
             Assert.InRange(active, 1, 2);
+            await db.UserSessions.ExecuteDeleteAsync(); // rodada limpa: o teto vale por rodada
         }
     }
 

@@ -165,7 +165,8 @@ public static class AuthEndpoints
         var issued = await sessions.CreateAsync(user, dek?.Value, previousRefreshToken, cancellationToken);
         if (issued is null)
         {
-            // A senha foi trocada enquanto este login acontecia: as credenciais enviadas ja nao valem.
+            // A senha foi trocada enquanto este login acontecia (as credenciais enviadas ja nao valem) ou
+            // a sessao recem-criada foi encerrada por outro login simultaneo (teto): nao ha sessao a entregar.
             return Results.Unauthorized();
         }
 

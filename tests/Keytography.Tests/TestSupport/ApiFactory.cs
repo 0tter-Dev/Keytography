@@ -35,8 +35,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IDisposable
     public FakeEmailSender EmailSender { get; } = new();
     public TestTimeProvider Time { get; } = new();
 
-    /// <summary>Preenchido depois que o host sobe (decorator do cache real de DEK).</summary>
-    public RecordingDekCache DekCache { get; private set; } = null!;
+    /// <summary>Decorator observavel do cache real de DEK (sobe o host se ainda nao subiu).</summary>
+    public RecordingDekCache DekCache => (RecordingDekCache)Services.GetRequiredService<IDekCache>();
     public string ConnectionString => $"Data Source={_dbPath}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -64,12 +64,8 @@ public class ApiFactory : WebApplicationFactory<Program>, IDisposable
 
             // Mesmo cache em memoria da aplicacao, mas observavel pelos testes de sessao.
             services.RemoveAll<IDekCache>();
-            services.AddSingleton<IDekCache>(provider =>
-            {
-                DekCache = new RecordingDekCache(
-                    new Keytography.Infrastructure.MemoryDekCache(provider.GetRequiredService<IMemoryCache>()));
-                return DekCache;
-            });
+            services.AddSingleton<IDekCache>(provider => new RecordingDekCache(
+                new Keytography.Infrastructure.MemoryDekCache(provider.GetRequiredService<IMemoryCache>())));
         });
     }
 
