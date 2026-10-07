@@ -10,7 +10,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | Interface web: sessão com refresh e logout real | [keytography-017](./plans/backlog/keytography-017-web-session-refresh-and-logout.md) — depende de keytography-016 (concluído); próximo da fila, antes da UI de cofre |
+| medium | Interface web: sessão com refresh e logout real | [keytography-017](./plans/review/keytography-017-web-session-refresh-and-logout.md) — depende de keytography-016 (concluído); em revisão (PR aberto); vem antes da UI de cofre |
 | medium | UI de cofre (CRUD núcleo) | [keytography-009](./plans/backlog/keytography-009-web-vault-entries-ui.md) — depende de keytography-008 e keytography-017 |
 | medium | UI de avaliação de força | [keytography-010](./plans/backlog/keytography-010-web-password-evaluation-ui.md) — depende de keytography-009 |
 | medium | UI de geração de senha | [keytography-011](./plans/backlog/keytography-011-web-password-generation-ui.md) — depende de keytography-009 |
@@ -18,7 +18,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 | medium | UI de supervisão do Admin (mínima) | [keytography-013](./plans/backlog/keytography-013-web-admin-supervision-ui.md) — depende de keytography-008, keytography-009 |
 | medium | Polimento visual, responsividade e interação | [keytography-014](./plans/backlog/keytography-014-web-visual-polish-and-interactions.md) — depende de keytography-010, 011, 012, 013 |
 
-`keytography-007` foi concluído em 2026-10-03, `keytography-008` em 2026-10-04 e `keytography-016` em 2026-10-06. Os planos acima permanecem em `backlog` (o `keytography-017` foi acrescentado em 2026-10-03, antes da UI de cofre, a pedido do usuário, para adaptar a interface web às sessões gerenciadas pelo backend, já entregues no `016` — ver [ADR-0006](./decisions/ADR-0006-backend-managed-sessions.md); até ele ser mergeado, a interface volta ao login a cada 15 minutos) — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
+`keytography-007` foi concluído em 2026-10-03, `keytography-008` em 2026-10-04 e `keytography-016` em 2026-10-06. Os planos acima, exceto o `keytography-017` (em revisão; adapta a interface web às sessões gerenciadas pelo backend, já entregues no `016` — ver [ADR-0006](./decisions/ADR-0006-backend-managed-sessions.md)), permanecem em `backlog` — promoção para `active` exige aprovação explícita do usuário, registrada no corpo do plano correspondente (ver `docs/plans/README.md`).
 
 ## Processo e governança
 

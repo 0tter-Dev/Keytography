@@ -1,6 +1,6 @@
 # ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend
 
-> **Status:** a "direção desejada" foi implementada no lado do servidor pelo [ADR-0006](./ADR-0006-backend-managed-sessions.md) (`keytography-016`). O modelo de **cliente** descrito abaixo (JWT em `sessionStorage`, logout local) segue vigente só até o `keytography-017` adaptar a interface web; depois dele, este ADR fica substituído pelo ADR-0006.
+> **Status: substituído pelo [ADR-0006](./ADR-0006-backend-managed-sessions.md).** A "direção desejada" foi implementada no servidor pelo `keytography-016` e o cliente web foi adaptado pelo `keytography-017` (access token só em memória, restauração por refresh, logout real). O modelo de cliente descrito abaixo (JWT em `sessionStorage`, logout local) é histórico.
 
 ## Context
 

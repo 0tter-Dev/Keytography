@@ -1,14 +1,17 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
+import { toast } from 'sonner'
 import { afterEach, vi } from 'vitest'
 import { useSessionStore } from '@/features/auth/session-store'
 import '@/i18n'
 
 afterEach(() => {
   cleanup()
+  toast.dismiss() // o estado dos avisos (sonner) é global: não pode vazar para o próximo teste
   localStorage.clear()
   sessionStorage.clear()
-  useSessionStore.getState().signOut()
+  // Estado inicial de verdade (inclui `restored: false`): cada teste começa como uma aba recém-aberta.
+  useSessionStore.setState(useSessionStore.getInitialState(), true)
   document.documentElement.removeAttribute('data-theme')
   document.documentElement.removeAttribute('data-accent')
 })

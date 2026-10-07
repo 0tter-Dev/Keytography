@@ -60,7 +60,7 @@ Desde `keytography-016`, o login cria uma sessão no banco: o access token (JWT)
 | `Sessions:MaxSessionsPerAdmin` | 10 | teto de sessões simultâneas de um `Admin`, de 1 a 100 |
 | `Sessions:ForceSecureCookie` | `false` | marca o cookie de refresh como `Secure` mesmo em requisições HTTP (proxy que termina TLS) |
 
-Valores fora do intervalo aceito (todos de no mínimo 1, com tetos de 1 dia para o access token, 30 dias de inatividade, 365 dias absolutos e 5 minutos de tolerância) fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. O CORS da API permite credenciais apenas para as origens listadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`), e `refresh`/`logout` recusam (403) um `Origin` presente que não esteja nessa lista; quem decide se o cookie é enviado é o navegador (`SameSite=Strict`, host e `Path=/auth`); com `curl`, use um cookie jar (`-c` e `-b`). Até o `keytography-017`, a interface web ainda não renova o token e volta ao login quando o access token vence.
+Valores fora do intervalo aceito (todos de no mínimo 1, com tetos de 1 dia para o access token, 30 dias de inatividade, 365 dias absolutos e 5 minutos de tolerância) fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. O CORS da API permite credenciais apenas para as origens listadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`), e `refresh`/`logout` recusam (403) um `Origin` presente que não esteja nessa lista; quem decide se o cookie é enviado é o navegador (`SameSite=Strict`, host e `Path=/auth`); com `curl`, use um cookie jar (`-c` e `-b`).
 
 ### Verificando as sessões com curl
 
@@ -165,7 +165,7 @@ A interface web (`keytography-007` em diante) é um projeto separado em `web/` (
 3. Cole o token na tela **Verificar e-mail** (aberta após o cadastro) e, em seguida, entre com o login e a senha.
 4. Para redefinir a senha, use **Esqueci minha senha**; o token de redefinição também aparece no log da API (vale 1 hora) e vai na tela **Redefinir senha**.
 
-A sessão da interface fica no `sessionStorage` do navegador (some ao fechar a aba). Desde `keytography-016` o access token dura 15 minutos e a interface ainda não o renova (até `keytography-017`): passado esse tempo, ela volta ao login.
+A interface guarda só o access token (15 minutos), **em memória**; a sessão vive na API e o refresh token em um cookie `HttpOnly`. Recarregar a página (F5) ou abrir outra aba restaura a sessão sozinho, o token é renovado em segundo plano e "Sair" encerra a sessão no servidor. Por causa do cookie, a origem da interface precisa estar em `Cors:AllowedOrigins` (padrão: `http://localhost:5173`). Para ver a renovação sem esperar, suba a API com `Sessions__AccessTokenMinutes=1` (a interface renova ~30 s antes do vencimento).
 
 **Scripts úteis (em `web/`):**
 

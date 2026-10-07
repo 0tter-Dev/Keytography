@@ -1,25 +1,21 @@
-import { useQuery } from '@tanstack/react-query'
-import { api } from '@/api/client'
-import type { components } from '@/api/schema'
-import { isSessionActive, useSessionStore } from './session-store'
+import { useEffect } from 'react'
+import { loadIdentity } from './session'
+import { useSessionStore } from './session-store'
 
-export type CurrentUser = components['schemas']['MeResponse']
-
-/** Usuário da sessão atual (`GET /auth/me`). Um 401 encerra a sessão via middleware do cliente. */
+/**
+ * Usuário da sessão atual (`GET /auth/me`, carregado sob demanda e conferido a cada renovação da
+ * sessão). Fica no store da sessão, e não no cache de consultas, para que a verificação de troca
+ * de conta compare a conta que esta aba mostra com a que o cookie compartilhado agora representa.
+ */
 export function useCurrentUser() {
-  const token = useSessionStore((state) => state.token)
-  const expiresAt = useSessionStore((state) => state.expiresAt)
+  const user = useSessionStore((state) => state.user)
+  const hasToken = useSessionStore((state) => state.token !== null)
 
-  return useQuery({
-    // O token na chave isola o cache por sessão: outro login nunca enxerga o usuário anterior.
-    queryKey: ['me', token],
-    enabled: isSessionActive({ token, expiresAt }),
-    queryFn: async () => {
-      const { data, response } = await api.GET('/auth/me')
-      if (!data) {
-        throw new Error(`GET /auth/me falhou (${response.status})`)
-      }
-      return data
-    },
-  })
+  useEffect(() => {
+    if (hasToken && user === null) {
+      void loadIdentity()
+    }
+  }, [hasToken, user])
+
+  return { data: user }
 }

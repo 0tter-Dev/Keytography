@@ -1,10 +1,14 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/api/client'
 import { routes } from '@/app/routes'
 import ptBR from '@/i18n/locales/pt-BR.json'
-import { renderRoutes, signInForTest, stubApi } from '@/test/render'
+import { REFRESHED, signInForTest, stubApi } from '@/test/api-stub'
+import { renderRoutes } from '@/test/render'
 import { RequireAuth } from './guards'
+import { REFRESH_LEAD_MS } from './session'
 import { useSessionStore } from './session-store'
 
 const { auth } = ptBR
@@ -20,12 +24,33 @@ async function fill(label: string, value: string) {
   await userEvent.type(screen.getByLabelText(label), value)
 }
 
+/** Tela de teste que faz uma chamada autenticada (o shell só chama endpoints sem renovação). */
+function VaultProbe() {
+  const { data } = useQuery({
+    queryKey: ['cofre'],
+    queryFn: async () => {
+      const { data, response } = await api.GET('/vault/entries')
+      if (!data) {
+        throw new Error(`falhou (${response.status})`)
+      }
+      return data
+    },
+  })
+  return <p>{data ? 'cofre carregado' : 'carregando cofre'}</p>
+}
+
+const withProbe = [
+  ...routes,
+  { element: <RequireAuth />, children: [{ path: '/probe', element: <VaultProbe /> }] },
+]
+
 describe('rotas protegidas e sessão', () => {
-  it('sem sessão, uma rota protegida redireciona para o login', async () => {
-    stubApi({})
-    renderRoutes(routes, '/')
+  it('sem sessão (e sem cookie de refresh), uma rota protegida leva ao login, sem aviso de expiração', async () => {
+    stubApi({ 'POST /auth/refresh': { status: 401 } })
+    renderRoutes(routes, '/', { restored: false })
 
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
+    expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
   })
 
   it('com sessão válida, a rota protegida abre e mostra o usuário', async () => {
@@ -45,7 +70,7 @@ describe('rotas protegidas e sessão', () => {
     expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
   })
 
-  it('JWT vencido no storage não vale como sessão', async () => {
+  it('access token vencido no store não vale como sessão', async () => {
     useSessionStore.getState().signIn('jwt', new Date(Date.now() - 1000).toISOString())
     stubApi({})
     renderRoutes(routes, '/')
@@ -53,41 +78,166 @@ describe('rotas protegidas e sessão', () => {
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
   })
 
-  it('uma chamada autenticada com 401 leva ao login, avisando que a sessão expirou', async () => {
-    signInForTest()
-    stubApi({ ...HEALTH, 'GET /auth/me': { status: 401 } })
+  it('uma chamada autenticada com 401 cujo refresh também é rejeitado leva ao login, avisando que a sessão expirou', async () => {
+    signInForTest('velho', undefined, ME)
+    stubApi({ 'GET /vault/entries': { status: 401 }, 'POST /auth/refresh': { status: 401 } })
+    renderRoutes(withProbe, '/probe')
+
+    expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
+    expect(screen.getByText(auth.login.sessionExpired)).toBeInTheDocument()
+  })
+
+  it('a sessão se renova sozinha antes de o access token vencer, sem o usuário perceber', async () => {
+    // Vencimento em 30,3 s: a renovação é agendada para ~300 ms depois de abrir.
+    signInForTest('curto', REFRESH_LEAD_MS + 300, ME)
+    const { calls } = stubApi({
+      ...HEALTH,
+      'GET /auth/me': { body: ME },
+      'POST /auth/refresh': REFRESHED('renovado'),
+    })
+    renderRoutes(routes, '/')
+    expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
+
+    await waitFor(() => expect(useSessionStore.getState().token).toBe('renovado'))
+
+    expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(1)
+    expect(screen.getByText(ptBR.health.title)).toBeInTheDocument() // continua na mesma tela
+    expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
+  })
+
+  it('se a API não responde até o vencimento, a sessão termina em vez de seguir com token morto', async () => {
+    signInForTest('curto', 200, ME)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     renderRoutes(routes, '/')
 
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
     expect(screen.getByText(auth.login.sessionExpired)).toBeInTheDocument()
   })
 
-  it('a sessão termina sozinha no instante em que o JWT vence', async () => {
-    signInForTest('jwt', 150)
-    stubApi({ ...HEALTH, 'GET /auth/me': { body: ME } })
-    renderRoutes(routes, '/')
-    expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
-
-    expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
-  })
-
-  it('logout limpa a sessão local e torna as rotas protegidas inacessíveis', async () => {
-    signInForTest()
-    stubApi({ ...HEALTH, 'GET /auth/me': { body: ME } })
-    const { router, client } = renderRoutes(routes, '/')
+  it('logout chama a API, limpa a sessão local e torna as rotas protegidas inacessíveis', async () => {
+    signInForTest('jwt-de-teste')
+    const { calls } = stubApi({
+      ...HEALTH,
+      'GET /auth/me': { body: ME },
+      'POST /auth/logout': { status: 204 },
+      'POST /auth/refresh': { status: 401 },
+    })
+    const { router } = renderRoutes(routes, '/')
     await screen.findByText('ana')
-    expect(client.getQueryData(['me', 'jwt-de-teste'])).toBeDefined()
 
     await userEvent.click(screen.getByRole('button', { name: ptBR.nav.logout }))
 
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
-    expect(useSessionStore.getState().token).toBeNull()
-    expect(client.getQueryData(['me', 'jwt-de-teste'])).toBeUndefined()
-    expect(sessionStorage.getItem('keytography.session')).not.toContain('jwt-de-teste')
+    const logout = calls.find((call) => call.path === '/auth/logout')
+    expect(logout?.credentials).toBe('include')
+    expect(logout?.headers.get('Authorization')).toBe('Bearer jwt-de-teste')
+    expect(useSessionStore.getState()).toMatchObject({ token: null, user: null })
     expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
 
     await act(() => router.navigate('/'))
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
+  })
+
+  it('logout com a API inacessível limpa a sessão local mesmo assim e avisa o usuário', async () => {
+    signInForTest('jwt-de-teste', undefined, ME)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    renderRoutes(routes, '/')
+    await screen.findByText('ana')
+
+    await userEvent.click(screen.getByRole('button', { name: ptBR.nav.logout }))
+
+    expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
+    expect(useSessionStore.getState()).toMatchObject({ token: null, user: null })
+    expect(await screen.findByText(auth.logoutUnreachable)).toBeInTheDocument()
+  })
+})
+
+describe('restauração da sessão ao abrir a aplicação', () => {
+  it('com cookie válido, recarregar a página (F5) entra direto, sem passar pela tela de login', async () => {
+    const { calls } = stubApi({
+      ...HEALTH,
+      'POST /auth/refresh': REFRESHED('restaurado'),
+      'GET /auth/me': { body: ME },
+    })
+    renderRoutes(routes, '/', { restored: false })
+
+    expect(screen.getByRole('status')).toHaveTextContent(auth.restoring) // sem piscar o login
+    expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: auth.login.title })).not.toBeInTheDocument()
+    expect(useSessionStore.getState().token).toBe('restaurado')
+    expect(calls.find((call) => call.path === '/auth/refresh')?.credentials).toBe('include')
+    expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(1)
+  })
+
+  it('o login também é pulado quando se abre diretamente /login com cookie válido', async () => {
+    stubApi({
+      ...HEALTH,
+      'POST /auth/refresh': REFRESHED('restaurado'),
+      'GET /auth/me': { body: ME },
+    })
+    renderRoutes(routes, '/login', { restored: false })
+
+    expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
+  })
+
+  it('sem cookie (refresh 401), vai ao login sem aviso de sessão expirada', async () => {
+    stubApi({ 'POST /auth/refresh': { status: 401 } })
+    renderRoutes(routes, '/', { restored: false })
+
+    expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
+    expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
+  })
+
+  it('o access token não aparece em localStorage nem em sessionStorage em nenhum momento', async () => {
+    stubApi({
+      ...HEALTH,
+      'POST /auth/refresh': REFRESHED('token-que-nao-pode-vazar'),
+      'GET /auth/me': { body: ME },
+    })
+    renderRoutes(routes, '/', { restored: false })
+    await screen.findByText('ana')
+
+    for (const storage of [localStorage, sessionStorage]) {
+      expect(JSON.stringify(Object.entries(storage))).not.toContain('token-que-nao-pode-vazar')
+    }
+    expect(useSessionStore.getState().token).toBe('token-que-nao-pode-vazar')
+  })
+})
+
+describe('troca de conta entre abas', () => {
+  it('quando outra conta entrou no navegador, avisa, volta ao início e mostra só a conta atual', async () => {
+    const BIA = { id: 'u2', login: 'bia', email: 'bia@example.com', role: 'Member' }
+    signInForTest('da-ana', undefined, ME)
+    stubApi({
+      'GET /vault/entries': (call) =>
+        call.headers.get('Authorization') === 'Bearer da-ana' ? { status: 401 } : { body: [] },
+      'POST /auth/refresh': REFRESHED('da-bia'),
+      'GET /auth/me': { body: BIA },
+      ...HEALTH,
+    })
+    const { router, client } = renderRoutes(withProbe, '/probe')
+    client.setQueryData(['dados-da-ana'], { segredo: true })
+
+    expect(await screen.findByText(auth.accountChanged)).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(await screen.findByText('bia')).toBeInTheDocument()
+    expect(screen.queryByText('ana')).not.toBeInTheDocument()
+    expect(client.getQueryData(['dados-da-ana'])).toBeUndefined() // nada da conta anterior no cache
+    expect(useSessionStore.getState().accountChanged).toBe(false) // aviso consumido
+  })
+
+  it('quando a mesma conta entra em outra aba, nada é avisado', async () => {
+    signInForTest('velho', undefined, ME)
+    stubApi({
+      'GET /vault/entries': (call) =>
+        call.headers.get('Authorization') === 'Bearer velho' ? { status: 401 } : { body: [] },
+      'POST /auth/refresh': REFRESHED('novo'),
+      'GET /auth/me': { body: ME },
+    })
+    renderRoutes(withProbe, '/probe')
+
+    expect(await screen.findByText('cofre carregado')).toBeInTheDocument()
+    expect(screen.queryByText(auth.accountChanged)).not.toBeInTheDocument()
   })
 })
 
@@ -109,6 +259,7 @@ describe('LoginPage', () => {
       login: 'ana',
       password: 'senha-forte-123',
     })
+    expect(calls.find((call) => call.path === '/auth/login')?.credentials).toBe('include')
     expect(useSessionStore.getState().token).toBe('jwt-novo')
     await waitFor(() =>
       expect(calls.find((call) => call.path === '/auth/me')?.headers.get('Authorization')).toBe(

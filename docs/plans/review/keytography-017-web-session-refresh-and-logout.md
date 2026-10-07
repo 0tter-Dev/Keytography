@@ -1,6 +1,6 @@
 ---
 id: keytography-017
-status: backlog
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -12,6 +12,7 @@ authorized_capabilities:
   - docs/capabilities/web-interface/README.md
 decision_records:
   - docs/decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md
+  - docs/decisions/ADR-0006-backend-managed-sessions.md
 validation: []
 documentation_updates: []
 ---
@@ -49,6 +50,18 @@ A `keytography-008` guarda o JWT em `sessionStorage` e trata o logout como local
 
 ## Approval
 
+Aprovado pelo usuário em 2026-10-06, ao pedir explicitamente a ativação e a implementação deste plano (o próximo da fila do `ROADMAP.md`). Este plano não altera a API, o banco nem o contrato (só consome os endpoints do `016`) e não muda criptografia, autenticação do backend nem controle de acesso por role; toca o **lado cliente** da sessão, cujas decisões já foram aprovadas no `016` e registradas no [ADR-0006](../../decisions/ADR-0006-backend-managed-sessions.md).
+
+**Esclarecimentos de implementação (2026-10-06)** — ajustes de meio, sem alterar o objetivo nem os critérios de aceite:
+
+- **Identidade no store, não no TanStack Query:** o usuário da sessão (`GET /auth/me`) passa a viver no store da sessão e `useCurrentUser()` o lê de lá (carregado sob demanda). A verificação de troca de conta compara a conta que a aba mostrava com a que o cookie compartilhado agora representa, e isso precisa acontecer fora do React. Consequência: as consultas deixam de incluir o token na `queryKey`, e o cache só é esvaziado quando a sessão termina ou a **conta muda** (renovar o token da mesma conta não limpa nada).
+- **Quando a sessão NÃO é derrubada:** um refresh que falha por rede, `403` ou `5xx` não encerra a sessão (só um `401` do refresh a encerra); a renovação em segundo plano tenta de novo a cada 15 s, e se o access token vence sem renovação a sessão termina.
+- **Parâmetros do cliente:** renovação 30 s antes do vencimento; um token com menos de 5 s restantes é renovado antes de a chamada sair; `/auth/me` e `/auth/logout` nunca disparam renovação (evita esperar por si mesmos).
+- **Troca de conta:** quando o refresh devolve outra conta, a chamada original **não** é repetida (devolveria dados da conta nova à tela da anterior); o aviso é mostrado pelo `RequireAuth`, que cobre qualquer tela protegida.
+- **Após 401 persistente:** além de encerrar a sessão como expirada, o cliente avisa a API (`logout`, em segundo plano) para o cookie não restaurar uma sessão sem DEK no próximo F5.
+- **Verificação manual do "toque no cofre":** ainda não existe tela de cofre (`keytography-009`), então o critério de reinício da API só é coberto por teste automatizado; o restante foi verificado manualmente no navegador (ver `Validation`).
+- **Auxiliares de teste** reorganizados: `src/test/api-stub.ts` (`stubApi`, `signInForTest`, `REFRESHED`) e `src/test/render.tsx` (`renderRoutes`, que agora inclui os avisos e, por padrão, uma aba que já restaurou a sessão).
+
 ## Acceptance Criteria
 
 - Depois de entrar, recarregar a página (F5) mantém o usuário logado sem tela de login: o cliente restaura a sessão por `POST /auth/refresh`; abrir o Keytography em outra aba também entra direto enquanto a sessão do servidor for válida.
@@ -57,7 +70,7 @@ A `keytography-008` guarda o JWT em `sessionStorage` e trata o logout como local
 - Quando o refresh responde 401, o usuário é levado ao login com o aviso "Sua sessão expirou"; o 401 persistente de uma chamada de cofre após um refresh bem-sucedido também termina em login, sem laço de requisições.
 - Com a aba 1 logada como A, um login como B na aba 2 do mesmo navegador faz a aba 1, na próxima chamada ou renovação, mostrar o aviso de troca de conta e passar a exibir a conta B (nenhum dado da conta A permanece na tela nem no cache); um login da mesma conta A na aba 2 não mostra aviso.
 - "Sair" chama `POST /auth/logout`, limpa a sessão e o cache locais e leva ao login; com o servidor inacessível, o estado local também é limpo e o aviso é exibido; depois do logout, uma tentativa de restaurar a sessão (F5) cai no login.
-- Verificação manual ponta a ponta contra a API real com `Sessions:AccessTokenMinutes` curto: sessão renova sozinha; logout invalida o access token antigo (a API responde 401); reinício da API leva ao login ao tocar no cofre.
+- Verificação manual ponta a ponta contra a API real com `Sessions:AccessTokenMinutes` curto: sessão renova sozinha; logout invalida o access token antigo (a API responde 401). O critério "reinício da API leva ao login ao tocar no cofre" só pode ser exercitado manualmente depois da tela de cofre (`keytography-009`); até lá é coberto por teste automatizado.
 - `npm run lint`, `format:check`, `build` e `npm test` passam, e o CI (`web` e `build`) permanece verde.
 
 ## Validation
