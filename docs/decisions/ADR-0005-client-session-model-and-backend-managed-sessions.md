@@ -1,5 +1,7 @@
 # ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend
 
+> **Status:** a "direção desejada" foi implementada no lado do servidor pelo [ADR-0006](./ADR-0006-backend-managed-sessions.md) (`keytography-016`). O modelo de **cliente** descrito abaixo (JWT em `sessionStorage`, logout local) segue vigente só até o `keytography-017` adaptar a interface web; depois dele, este ADR fica substituído pelo ADR-0006.
+
 ## Context
 
 A API emite um JWT de 1 hora no login (`POST /auth/login`) e não tem refresh token, endpoint de logout nem registro de sessões: a validação é puramente stateless (assinatura e validade do token). Ao mesmo tempo, o servidor guarda a DEK decifrada do usuário em um cache em memória, com expiração igual à do JWT ([ADR-0002](./ADR-0002-dek-session-cache.md)). Quando o JWT vence, o cache vence junto e o usuário precisa informar a senha de novo — é a única forma de reconstruir a DEK, porque o servidor não guarda a senha.
@@ -15,9 +17,9 @@ A interface web (`keytography-008`) precisou decidir onde o cliente guarda o tok
 3. **O JWT só acompanha chamadas autenticadas.** Endpoints anônimos (`/auth/login`, `/auth/register`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password`, `/health`) nunca o recebem, e o 401 de um deles nunca encerra a sessão.
 4. **"Sair" é local:** limpa o token e o cache no navegador. Não existe revogação no servidor, então o token continua válido até vencer e a DEK segue em cache no servidor até o fim do tempo de vida do JWT (consequência direta do ADR-0002).
 
-**Direção desejada (ainda não implementada):** sessões **gerenciadas e controladas pelo backend, persistidas no banco**, com validação do estado da sessão nos endpoints, refresh de token e logout/revogação reais (inclusive de todas as sessões do usuário). Isso resolve as limitações acima: "Sair" passaria a invalidar de fato a sessão e a remover a DEK do cache; o token de acesso poderia ser de vida curta com refresh controlado; e a política de onde o cliente guarda o token poderia ser revista (por exemplo, cookie `HttpOnly` para o refresh).
+**Direção desejada (implementada no servidor pelo ADR-0006; a adaptação do cliente web é o `keytography-017`):** sessões **gerenciadas e controladas pelo backend, persistidas no banco**, com validação do estado da sessão nos endpoints, refresh de token e logout/revogação reais (inclusive de todas as sessões do usuário). Isso resolve as limitações acima: "Sair" passaria a invalidar de fato a sessão e a remover a DEK do cache; o token de acesso poderia ser de vida curta com refresh controlado; e a política de onde o cliente guarda o token poderia ser revista (por exemplo, cookie `HttpOnly` para o refresh).
 
-Esta direção **não faz parte da entrega que originou este ADR**: está planejada em `keytography-016` (backend) e `keytography-017` (interface web), ainda em `backlog` e dependentes de aprovação humana. Ela depende de um plano próprio com aprovação humana explícita, porque:
+Esta direção **não faz parte da entrega que originou este ADR**: está implementada no servidor pelo `keytography-016` ([ADR-0006](./ADR-0006-backend-managed-sessions.md)) e será adotada pela interface web no `keytography-017` (ainda em `backlog`, dependente de aprovação humana). Ela depende de um plano próprio com aprovação humana explícita, porque:
 
 - altera o contrato público da API (novos endpoints e respostas) e o esquema do banco (migration de sessões);
 - altera o fluxo de autenticação e o controle de sessão do backend, o que o `AGENTS.md` classifica como mudança que sempre exige revisão humana;

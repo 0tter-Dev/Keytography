@@ -1,5 +1,6 @@
 using Keytography.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Keytography.Infrastructure;
 
@@ -12,10 +13,19 @@ public class KeytographyDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<UserToken> UserTokens => Set<UserToken>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<UserPasswordHistory> UserPasswordHistories => Set<UserPasswordHistory>();
     public DbSet<VaultKey> VaultKeys => Set<VaultKey>();
     public DbSet<VaultEntry> VaultEntries => Set<VaultEntry>();
     public DbSet<VaultEntryHistory> VaultEntryHistories => Set<VaultEntryHistory>();
+
+    private static readonly ValueConverter<DateTimeOffset, long> UtcTicks = new(
+        value => value.UtcTicks,
+        ticks => new DateTimeOffset(ticks, TimeSpan.Zero));
+
+    private static readonly ValueConverter<DateTimeOffset?, long?> NullableUtcTicks = new(
+        value => value.HasValue ? value.Value.UtcTicks : null,
+        ticks => ticks.HasValue ? new DateTimeOffset(ticks.Value, TimeSpan.Zero) : null);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +41,32 @@ public class KeytographyDbContext : DbContext
             entity.HasOne<User>()
                 .WithMany()
                 .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.HasIndex(s => s.UserId);
+            entity.HasIndex(s => s.RefreshTokenHash);
+            entity.HasIndex(s => s.PreviousRefreshTokenHash);
+            // Consulta de limpeza de sessoes encerradas (a cada login) e de contagem para o teto.
+            entity.HasIndex(s => s.RevokedAt);
+            entity.HasIndex(s => s.IdleExpiresAt);
+            entity.HasIndex(s => s.AbsoluteExpiresAt);
+            entity.Property(s => s.RevokedReason).HasConversion<string>();
+
+            // SQLite nao compara DateTimeOffset no banco; guardar como ticks UTC (inteiro)
+            // permite a limpeza e as consultas por data serem feitas no proprio banco.
+            entity.Property(s => s.CreatedAt).HasConversion(UtcTicks);
+            entity.Property(s => s.LastRefreshedAt).HasConversion(UtcTicks);
+            entity.Property(s => s.IdleExpiresAt).HasConversion(UtcTicks);
+            entity.Property(s => s.AbsoluteExpiresAt).HasConversion(UtcTicks);
+            entity.Property(s => s.RefreshRotatedAt).HasConversion(NullableUtcTicks);
+            entity.Property(s => s.RevokedAt).HasConversion(NullableUtcTicks);
+
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

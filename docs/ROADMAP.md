@@ -10,7 +10,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | Sessões gerenciadas pelo backend (API) | [keytography-016](./plans/backlog/keytography-016-backend-managed-sessions.md) — depende de keytography-008; precisa de aprovação humana (autenticação, sessão e DEK) |
+| medium | Sessões gerenciadas pelo backend (API) | [keytography-016](./plans/review/keytography-016-backend-managed-sessions.md) — depende de keytography-008; em revisão (PR aberto); precisa de aprovação humana (autenticação, sessão e DEK) |
 | medium | Interface web: sessão com refresh e logout real | [keytography-017](./plans/backlog/keytography-017-web-session-refresh-and-logout.md) — depende de keytography-016; deve ser mergeado logo após ele |
 | medium | UI de cofre (CRUD núcleo) | [keytography-009](./plans/backlog/keytography-009-web-vault-entries-ui.md) — depende de keytography-008 e keytography-017 |
 | medium | UI de avaliação de força | [keytography-010](./plans/backlog/keytography-010-web-password-evaluation-ui.md) — depende de keytography-009 |

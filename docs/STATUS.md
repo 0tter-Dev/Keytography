@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Core/backend completo: `keytography-001` a `keytography-006` concluídos — as 4 capabilities do roadmap original (autenticação, cofre, avaliação e geração de senha) estão `implemented`. Interface web em andamento: a fundação (`keytography-007`) está concluída; a UI de autenticação (`keytography-008`) também; `009` a `014`, mais as sessões gerenciadas pelo backend (`016` e `017`, que vêm antes da UI de cofre), seguem em `backlog`. A verificação automática de governança documental e de convenções de PR (`keytography-015`) também está concluída.
+Core/backend completo: `keytography-001` a `keytography-006` concluídos — as 4 capabilities do roadmap original (autenticação, cofre, avaliação e geração de senha) estão `implemented`. Interface web em andamento: a fundação (`keytography-007`) está concluída; a UI de autenticação (`keytography-008`) também; `009` a `014`, mais a adaptação web das sessões (`017`, que vem antes da UI de cofre), seguem em `backlog`; as sessões gerenciadas pelo backend (`016`) estão em revisão (PR aberto). A verificação automática de governança documental e de convenções de PR (`keytography-015`) também está concluída.
 
 ## Milestones
 

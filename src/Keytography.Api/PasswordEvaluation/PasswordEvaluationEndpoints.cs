@@ -35,7 +35,7 @@ public static class PasswordEvaluationEndpoints
 
         foreach (var vaultKey in vaultKeys)
         {
-            var dek = RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek);
+            using var dek = new SecretBytes(RsaEnvelope.Unwrap(recoveryKeyProvider.Key, vaultKey.RecoveryWrappedDek));
 
             var entries = await db.VaultEntries
                 .Where(e => e.UserId == vaultKey.UserId && !e.IsDeleted)
@@ -47,10 +47,10 @@ public static class PasswordEvaluationEndpoints
 
             var currentPasswordByEntry = entries.ToDictionary(
                 e => e.Id,
-                e => AesGcmCipher.DecryptString(dek, e.EncryptedPassword));
+                e => AesGcmCipher.DecryptString(dek.Value, e.EncryptedPassword));
             var historyPasswordsByEntry = histories
                 .GroupBy(h => h.VaultEntryId)
-                .ToDictionary(g => g.Key, g => g.Select(h => AesGcmCipher.DecryptString(dek, h.EncryptedPassword)).ToList());
+                .ToDictionary(g => g.Key, g => g.Select(h => AesGcmCipher.DecryptString(dek.Value, h.EncryptedPassword)).ToList());
 
             foreach (var entry in entries)
             {

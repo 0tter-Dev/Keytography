@@ -3,6 +3,7 @@ using System;
 using Keytography.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Keytography.Infrastructure.Migrations
 {
     [DbContext(typeof(KeytographyDbContext))]
-    partial class KeytographyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004044509_AddUserSessions")]
+    partial class AddUserSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
@@ -43,9 +46,6 @@ namespace Keytography.Infrastructure.Migrations
 
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("SecurityStamp")
-                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -115,23 +115,14 @@ namespace Keytography.Infrastructure.Migrations
                     b.Property<string>("RevokedReason")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid>("SecurityStamp")
-                        .HasColumnType("TEXT");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AbsoluteExpiresAt");
-
-                    b.HasIndex("IdleExpiresAt");
-
                     b.HasIndex("PreviousRefreshTokenHash");
 
                     b.HasIndex("RefreshTokenHash");
-
-                    b.HasIndex("RevokedAt");
 
                     b.HasIndex("UserId");
 
