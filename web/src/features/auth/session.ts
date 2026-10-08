@@ -13,11 +13,16 @@ import { useSessionStore, type CurrentUser } from './session-store'
 export const REFRESH_LEAD_MS = 30_000
 
 /**
- * Piso do atraso até a próxima renovação agendada. Sem ele, um token já "dentro da janela de
- * renovação" (relógio adiantado, vida útil menor que a antecedência) reagendaria com atraso 0 e
- * renovaria em laço, rotacionando o refresh token no servidor a cada volta.
+ * Piso do atraso até a próxima renovação agendada, que dobra a cada renovação seguida cujo token já
+ * nasce "dentro da janela de renovação" (relógio adiantado, vida útil menor que a antecedência).
  */
 export const MIN_RENEW_DELAY_MS = 5_000
+
+/**
+ * Quantas renovações seguidas com token já dentro da janela são toleradas; depois disso o cliente
+ * para de renovar em segundo plano (cada renovação rotaciona o refresh token no servidor).
+ */
+export const MAX_SHORT_RENEWALS = 5
 
 /** Espera antes de tentar de novo quando a API não respondeu a uma renovação. */
 export const RETRY_AFTER_UNREACHABLE_MS = 15_000
@@ -28,44 +33,74 @@ export const REFRESH_TIMEOUT_MS = 20_000
 /** `discarded`: a sessão terminou (logout/expiração) enquanto o refresh voava; a resposta é ignorada. */
 type RefreshOutcome = 'renewed' | 'rejected' | 'unreachable' | 'discarded'
 
-/** Resultado de uma renovação completa. `accountChanged`: outra conta passou a valer neste navegador. */
-export type RenewResult = 'renewed' | 'accountChanged' | 'rejected' | 'unreachable' | 'discarded'
+/**
+ * Resultado de uma renovação completa. `accountChanged`: outra conta passou a valer neste
+ * navegador. `unverified`: o token foi renovado, mas não deu para conferir de quem ele é.
+ */
+export type RenewResult =
+  'renewed' | 'accountChanged' | 'unverified' | 'rejected' | 'unreachable' | 'discarded'
 
-let refreshInflight: Promise<RefreshOutcome> | null = null
-let identityInflight: { token: string | null; promise: Promise<CurrentUser | null> } | null = null
+type Inflight<T> = { key: string | number | null; promise: Promise<T> }
+
+let refreshInflight: Inflight<RefreshOutcome> | null = null
+let identityInflight: Inflight<CurrentUser | null> | null = null
+
+/** Zera o estado de módulo (chamadas em voo). Só para os testes. */
+export function resetSessionRuntime(): void {
+  refreshInflight = null
+  identityInflight = null
+}
 
 /** Resolve quando não há refresh em andamento (imediatamente se não há nenhum). */
 export async function settleRefresh(): Promise<void> {
-  await refreshInflight
+  await refreshInflight?.promise
 }
 
-/** `POST /auth/refresh` com o cookie; uma única chamada em andamento por aba, compartilhada por todos. */
+/**
+ * `POST /auth/refresh` com o cookie; uma única chamada em andamento por aba e por "época" da
+ * sessão, compartilhada por todos. Um refresh de uma sessão que já terminou não é compartilhado
+ * com quem pede depois (ex.: novo login durante o voo): ele será descartado ao chegar.
+ */
 function refreshToken(): Promise<RefreshOutcome> {
-  refreshInflight ??= (async (): Promise<RefreshOutcome> => {
-    const epoch = useSessionStore.getState().epoch
-    try {
-      const { data, response } = await api.POST('/auth/refresh', {
-        credentials: 'include',
-        signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
-      })
-      // Logout/expiração durante o voo: aceitar a resposta ressuscitaria uma sessão já encerrada.
-      if (useSessionStore.getState().epoch !== epoch) {
-        return 'discarded'
-      }
-      if (response.ok && data) {
-        useSessionStore.getState().signIn(data.token, data.expiresAt)
-        return 'renewed'
-      }
-      // 401: cookie ausente, desconhecido ou de sessão encerrada. Outros status (403 de Origin,
-      // 5xx) não dizem que a sessão acabou: não a derrubamos por isso.
-      return response.status === 401 ? 'rejected' : 'unreachable'
-    } catch {
-      return 'unreachable'
+  const epoch = useSessionStore.getState().epoch
+  if (refreshInflight?.key !== epoch) {
+    const entry: Inflight<RefreshOutcome> = {
+      key: epoch,
+      promise: requestRefresh(epoch).finally(() => {
+        if (refreshInflight === entry) {
+          refreshInflight = null
+        }
+      }),
     }
-  })().finally(() => {
-    refreshInflight = null
-  })
-  return refreshInflight
+    refreshInflight = entry
+  }
+  return refreshInflight.promise
+}
+
+async function requestRefresh(epoch: number): Promise<RefreshOutcome> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
+  try {
+    const { data, response } = await api.POST('/auth/refresh', {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+    // Logout/expiração durante o voo: aceitar a resposta ressuscitaria uma sessão já encerrada.
+    if (useSessionStore.getState().epoch !== epoch) {
+      return 'discarded'
+    }
+    if (response.ok && data) {
+      useSessionStore.getState().signIn(data.token, data.expiresAt)
+      return 'renewed'
+    }
+    // 401: cookie ausente, desconhecido ou de sessão encerrada. Outros status (403 de Origin,
+    // 5xx) não dizem que a sessão acabou: não a derrubamos por isso.
+    return response.status === 401 ? 'rejected' : 'unreachable'
+  } catch {
+    return 'unreachable'
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**
@@ -74,9 +109,9 @@ function refreshToken(): Promise<RefreshOutcome> {
  */
 function fetchIdentity(): Promise<CurrentUser | null> {
   const token = useSessionStore.getState().token
-  if (identityInflight?.token !== token) {
-    const entry = {
-      token,
+  if (identityInflight?.key !== token) {
+    const entry: Inflight<CurrentUser | null> = {
+      key: token,
       promise: (async (): Promise<CurrentUser | null> => {
         try {
           const { data } = await api.GET('/auth/me')
@@ -115,10 +150,23 @@ export async function loadIdentity(): Promise<boolean> {
   return useSessionStore.getState().user !== null
 }
 
+/** Lê a conta do token atual e a grava; devolve se é a mesma que a aba mostrava, outra, ou se não deu. */
+async function checkAccount(): Promise<'same' | 'changed' | 'unknown'> {
+  const previous = useSessionStore.getState().user
+  const user = await fetchIdentity()
+  if (!user) {
+    return 'unknown'
+  }
+  useSessionStore.getState().setUser(user)
+  return previous !== null && previous.id !== user.id ? 'changed' : 'same'
+}
+
 /**
  * Renova o access token pelo cookie de refresh e confere se a conta continua a mesma. Se o
  * refresh é rejeitado e havia sessão, ela termina como expirada; ao restaurar (`restoring`) a
- * rejeição só significa "não há sessão".
+ * rejeição só significa "não há sessão". Se a conta não pôde ser conferida (`GET /auth/me` falhou)
+ * e a aba já mostrava uma, o resultado é `unverified`: nenhuma chamada autenticada sai até
+ * `confirmAccount` conseguir conferir.
  */
 export async function renewSession({ restoring = false } = {}): Promise<RenewResult> {
   const outcome = await refreshToken()
@@ -144,15 +192,29 @@ export async function renewSession({ restoring = false } = {}): Promise<RenewRes
 
   // Outra aba pode ter entrado com outra conta: o cookie é compartilhado, então este refresh já
   // devolve a sessão da conta nova. Comparamos com o usuário que esta aba mostrava.
-  const previous = useSessionStore.getState().user
-  const user = await fetchIdentity()
-  if (user) {
-    useSessionStore.getState().setUser(user)
-    if (previous !== null && previous.id !== user.id) {
-      return 'accountChanged'
-    }
+  const hadUser = useSessionStore.getState().user !== null
+  const check = await checkAccount()
+  if (check === 'changed') {
+    return 'accountChanged'
+  }
+  if (check === 'unknown' && hadUser) {
+    useSessionStore.setState({ unverified: true })
+    return 'unverified'
   }
   return 'renewed'
+}
+
+/**
+ * Tenta de novo a conferência de conta pendente (`unverified`), sem renovar o token. Devolve
+ * `renewed` se a conta é a mesma (a pendência some), `accountChanged` se mudou, `unverified` se
+ * ainda não deu.
+ */
+export async function confirmAccount(): Promise<RenewResult> {
+  const check = await checkAccount()
+  if (check === 'changed') {
+    return 'accountChanged'
+  }
+  return check === 'same' ? 'renewed' : 'unverified'
 }
 
 /**
@@ -169,15 +231,16 @@ export async function restoreSession(): Promise<RenewResult | null> {
 }
 
 /**
- * Logout real: avisa a API (que revoga a sessão e remove a DEK dela) e então limpa o estado local.
- * Se a API não responde, o estado local é limpo mesmo assim e o resultado é `unreachable`.
+ * Encerra a sessão pela API e então limpa o estado local, mesmo se a API não responde (resultado
+ * `unreachable`). Um refresh em voo não pode reabrir a sessão que está sendo encerrada.
  */
-export async function logoutSession(): Promise<'server' | 'unreachable'> {
+async function endSessionVia(
+  call: () => Promise<{ response: Response }>,
+): Promise<'server' | 'unreachable'> {
   let result: 'server' | 'unreachable' = 'server'
-  // Um refresh em voo não pode reabrir a sessão que está sendo encerrada.
   useSessionStore.setState((state) => ({ epoch: state.epoch + 1 }))
   try {
-    const { response } = await api.POST('/auth/logout', { credentials: 'include' })
+    const { response } = await call()
     if (!response.ok) {
       result = 'unreachable'
     }
@@ -186,6 +249,20 @@ export async function logoutSession(): Promise<'server' | 'unreachable'> {
   }
   useSessionStore.getState().signOut()
   return result
+}
+
+/** Logout real: a API revoga a sessão e remove a DEK dela; depois o estado local é limpo. */
+export function logoutSession(): Promise<'server' | 'unreachable'> {
+  return endSessionVia(() => api.POST('/auth/logout', { credentials: 'include' }))
+}
+
+/**
+ * "Sair de todos os dispositivos": a API revoga todas as sessões do usuário (e apaga o cookie, por
+ * isso `credentials: 'include'`); depois o estado local é limpo. A tela que usa isto é do
+ * `keytography-012`.
+ */
+export function logoutAllSessions(): Promise<'server' | 'unreachable'> {
+  return endSessionVia(() => api.POST('/auth/logout-all', { credentials: 'include' }))
 }
 
 /**

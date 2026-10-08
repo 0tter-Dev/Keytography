@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useSessionStore } from '@/features/auth/session-store'
 import { REFRESHED, signInForTest, stubApi, type StubbedCall } from '@/test/api-stub'
-import { api } from './client'
+import { api, pendingRequestCount } from './client'
 
 const ana = { id: 'u1', login: 'ana', email: 'ana@example.com', role: 'Member' }
 const bia = { id: 'u2', login: 'bia', email: 'bia@example.com', role: 'Member' }
@@ -242,5 +242,166 @@ describe('troca de conta em outra aba', () => {
 
     expect(response.status).toBe(200)
     expect(useSessionStore.getState().accountChanged).toBe(false)
+  })
+})
+
+describe('chamada que não pode sair com o token de outra conta', () => {
+  it('token prestes a vencer e o refresh devolve OUTRA conta: a chamada NÃO sai e a troca é marcada', async () => {
+    signInForTest('quase-vencendo', 1_000, ana)
+    const { calls } = stubApi({
+      'GET /vault/entries': { body: [] },
+      'POST /auth/refresh': REFRESHED('da-bia'),
+      'GET /auth/me': { body: bia },
+    })
+
+    const { response } = await api.GET('/vault/entries')
+
+    expect(response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(0) // nada do que a tela da ana digitou chega à bia
+    expect(useSessionStore.getState()).toMatchObject({ user: bia, accountChanged: true })
+  })
+
+  it('token prestes a vencer e a conta não pôde ser conferida: a chamada NÃO sai, e fica pendente de conferência', async () => {
+    signInForTest('quase-vencendo', 1_000, ana)
+    const { calls } = stubApi({
+      'GET /vault/entries': { body: [] },
+      'POST /auth/refresh': REFRESHED('novo'),
+      'GET /auth/me': { status: 503 },
+    })
+
+    const { response } = await api.GET('/vault/entries')
+
+    expect(response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(0)
+    expect(useSessionStore.getState()).toMatchObject({ token: 'novo', user: ana, unverified: true })
+  })
+
+  it('com a conta por conferir, a próxima chamada confere antes: mesma conta libera, falha segue bloqueando', async () => {
+    signInForTest('t1', undefined, ana)
+    useSessionStore.setState({ unverified: true })
+    let meOk = false
+    const { calls } = stubApi({
+      'GET /vault/entries': { body: [] },
+      'GET /auth/me': () => (meOk ? { body: ana } : { status: 503 }),
+    })
+
+    const blocked = await api.GET('/vault/entries')
+    expect(blocked.response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(0)
+    expect(useSessionStore.getState().unverified).toBe(true)
+
+    meOk = true
+    const released = await api.GET('/vault/entries')
+    expect(released.response.status).toBe(200)
+    expect(useSessionStore.getState().unverified).toBe(false)
+  })
+
+  it('com a conta por conferir e agora conferida como OUTRA, a chamada não sai', async () => {
+    signInForTest('t1', undefined, ana)
+    useSessionStore.setState({ unverified: true })
+    const { calls } = stubApi({ 'GET /vault/entries': { body: [] }, 'GET /auth/me': { body: bia } })
+
+    const { response } = await api.GET('/vault/entries')
+
+    expect(response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(0)
+    expect(useSessionStore.getState()).toMatchObject({ user: bia, accountChanged: true })
+  })
+
+  it('um 401 tardio de um token já trocado, com a conta por conferir, NÃO é repetido com o token novo', async () => {
+    signInForTest('antigo', undefined, ana)
+    const { calls } = stubApi({
+      'GET /vault/entries': (call) => {
+        if (call.headers.get('Authorization') === 'Bearer antigo') {
+          signInForTest('atual', undefined, ana) // outra renovação trocou o token...
+          useSessionStore.setState({ unverified: true }) // ...e não conseguiu conferir a conta
+          return { status: 401 }
+        }
+        return { body: [] }
+      },
+    })
+
+    const { response } = await api.GET('/vault/entries')
+
+    expect(response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(1)
+  })
+})
+
+describe('chamadas que nunca disparam renovação', () => {
+  it('/auth/me e /auth/logout saem mesmo com o token vencido, sem refresh (evita esperar por si mesmos)', async () => {
+    signInForTest('vencido', 1_000, ana)
+    const { calls } = stubApi({
+      'GET /auth/me': { body: ana },
+      'POST /auth/logout': { status: 204 },
+      'POST /auth/refresh': REFRESHED('novo'),
+    })
+
+    await api.GET('/auth/me')
+    await api.POST('/auth/logout')
+
+    expect(countOf(calls, 'POST', '/auth/refresh')).toBe(0)
+    expect(calls[0]?.headers.get('Authorization')).toBe('Bearer vencido')
+  })
+
+  it('um 401 de /auth/me não dispara renovação nem repetição', async () => {
+    signInForTest('t1', undefined, ana)
+    const { calls } = stubApi({
+      'GET /auth/me': { status: 401 },
+      'POST /auth/refresh': REFRESHED('t2'),
+    })
+
+    const { response } = await api.GET('/auth/me')
+
+    expect(response.status).toBe(401)
+    expect(calls).toHaveLength(1)
+  })
+})
+
+describe('falha de rede', () => {
+  it('não deixa a cópia da requisição guardada', async () => {
+    signInForTest('t1', undefined, ana)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    await expect(api.GET('/vault/entries')).rejects.toThrow('Failed to fetch')
+
+    expect(pendingRequestCount()).toBe(0)
+  })
+
+  it('uma resposta (mesmo 401) também libera a cópia', async () => {
+    signInForTest('t1', undefined, ana)
+    stubApi({ 'GET /vault/entries': { body: [] } })
+
+    await api.GET('/vault/entries')
+
+    expect(pendingRequestCount()).toBe(0)
+  })
+})
+
+describe('conta por conferir com a API instável', () => {
+  it('token para vencer + conta por conferir + refresh inalcançável + /auth/me fora: a chamada NÃO sai', async () => {
+    signInForTest('quase-vencendo', 1_000, ana)
+    useSessionStore.setState({ unverified: true })
+    const { calls } = stubApi({
+      'GET /vault/entries': { body: [] },
+      'POST /auth/refresh': { status: 503 },
+      'GET /auth/me': { status: 503 },
+    })
+
+    const { response } = await api.GET('/vault/entries')
+
+    expect(response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(0)
+  })
+})
+
+describe('caminhos públicos', () => {
+  it('só o caminho exato é público: um caminho que apenas TERMINA igual a um público leva o token', async () => {
+    signInForTest('meu-jwt')
+    const { calls } = stubApi({ 'GET /x/health': { body: {} } })
+
+    await api.GET('/x/health' as never)
+
+    expect(calls[0]?.headers.get('Authorization')).toBe('Bearer meu-jwt')
   })
 })

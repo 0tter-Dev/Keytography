@@ -16,6 +16,11 @@ type SessionState = {
   restored: boolean
   /** `true` quando a conta mudou em outra aba/janela e o aviso ainda não foi mostrado. */
   accountChanged: boolean
+  /**
+   * `true` quando a sessão foi renovada, mas não foi possível conferir (`GET /auth/me`) se o cookie
+   * ainda representa a conta que a aba mostra: nenhuma chamada autenticada sai até a conferência.
+   */
+  unverified: boolean
   /** Sobe a cada fim de sessão: um refresh iniciado numa época anterior é descartado ao chegar. */
   epoch: number
   signIn: (token: string, expiresAt: string) => void
@@ -38,6 +43,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
   expired: false,
   restored: false,
   accountChanged: false,
+  unverified: false,
   epoch: 0,
   // Uma renovação (refresh) também passa por aqui: mantém o usuário já carregado.
   signIn: (token, expiresAt) =>
@@ -45,6 +51,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
   setUser: (user) =>
     set((state) => ({
       user,
+      unverified: false,
       accountChanged: state.accountChanged || (state.user !== null && state.user.id !== user.id),
     })),
   markRestored: () => set({ restored: true }),
@@ -56,6 +63,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
       user: null,
       expired: false,
       accountChanged: false,
+      unverified: false,
       restored: true,
       epoch: state.epoch + 1,
     })),
@@ -66,6 +74,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
       user: null,
       expired: true,
       accountChanged: false,
+      unverified: false,
       restored: true,
       epoch: state.epoch + 1,
     })),

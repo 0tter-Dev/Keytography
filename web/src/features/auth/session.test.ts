@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { REFRESHED, signInForTest, stubApi } from '@/test/api-stub'
 import {
   REFRESH_TIMEOUT_MS,
+  confirmAccount,
   loadIdentity,
+  logoutAllSessions,
   logoutSession,
   renewSession,
   restoreSession,
@@ -10,8 +12,10 @@ import {
 import { useSessionStore } from './session-store'
 
 const ana = { id: 'u1', login: 'ana', email: 'ana@example.com', role: 'Member' }
+const bia = { id: 'u2', login: 'bia', email: 'bia@example.com', role: 'Member' }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -124,29 +128,35 @@ describe('refresh em voo e fim da sessão', () => {
 })
 
 describe('tempo limite do refresh', () => {
-  it('o refresh leva um sinal com tempo limite; estourá-lo conta como API inalcançável', async () => {
-    const timeout = new AbortController()
-    const spy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal)
+  it('um servidor que nunca responde não trava a restauração: estourado o tempo limite, a API conta como inalcançável', async () => {
+    vi.useFakeTimers()
     vi.stubGlobal(
       'fetch',
       vi.fn(
         (request: Request) =>
           new Promise<Response>((_resolve, reject) => {
-            const fail = () => reject(new TypeError('aborted'))
-            if (request.signal.aborted) {
-              fail()
-            }
-            request.signal.addEventListener('abort', fail)
+            request.signal.addEventListener('abort', () => reject(new TypeError('aborted')))
           }),
       ),
     )
 
     const restoring = restoreSession()
-    timeout.abort()
+    await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS - 1)
+    expect(useSessionStore.getState().restored).toBe(false)
+    await vi.advanceTimersByTimeAsync(2)
 
     expect(await restoring).toBe('unreachable')
-    expect(spy).toHaveBeenCalledWith(REFRESH_TIMEOUT_MS)
     expect(useSessionStore.getState().restored).toBe(true)
+  })
+
+  it('o tempo limite só vale para o refresh que passou dele: uma resposta rápida não é abortada', async () => {
+    vi.useFakeTimers()
+    stubApi({ 'POST /auth/refresh': REFRESHED('t2'), 'GET /auth/me': { body: ana } })
+
+    expect(await restoreSession()).toBe('renewed')
+    await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS * 2)
+
+    expect(useSessionStore.getState().token).toBe('t2')
   })
 })
 
@@ -201,5 +211,112 @@ describe('identidade da sessão', () => {
     stubApi({ 'GET /auth/me': { body: ana } })
     expect(await loadIdentity()).toBe(true)
     expect(useSessionStore.getState().user).toEqual(ana)
+  })
+})
+
+describe('refresh de uma sessão que já terminou', () => {
+  it('não é compartilhado com quem pede depois de um novo login: este recebe o próprio refresh', async () => {
+    signInForTest('t1', undefined, ana)
+    const oldGate = gate()
+    let n = 0
+    const { calls } = stubApi({
+      'POST /auth/refresh': async () => {
+        if (++n === 1) {
+          await oldGate.opened
+          return REFRESHED('velho')
+        }
+        return REFRESHED('do-novo-login')
+      },
+      'POST /auth/logout': { status: 204 },
+      'GET /auth/me': { body: ana },
+    })
+
+    const first = renewSession()
+    await logoutSession()
+    signInForTest('login-novo', undefined, ana)
+    const second = renewSession()
+    oldGate.open()
+
+    expect(await first).toBe('discarded')
+    expect(await second).toBe('renewed')
+    expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(2)
+    expect(useSessionStore.getState().token).toBe('do-novo-login')
+  })
+})
+
+describe('conferência da conta depois de renovar', () => {
+  it('não conseguir ler /auth/me com uma conta já exibida deixa a conta por conferir', async () => {
+    signInForTest('t1', undefined, ana)
+    stubApi({ 'POST /auth/refresh': REFRESHED('t2'), 'GET /auth/me': { status: 503 } })
+
+    expect(await renewSession()).toBe('unverified')
+    expect(useSessionStore.getState()).toMatchObject({ token: 't2', user: ana, unverified: true })
+  })
+
+  it('sem conta exibida ainda, falhar a leitura não bloqueia nada (não há com o que comparar)', async () => {
+    signInForTest('t1')
+    stubApi({ 'POST /auth/refresh': REFRESHED('t2'), 'GET /auth/me': { status: 503 } })
+
+    expect(await renewSession()).toBe('renewed')
+    expect(useSessionStore.getState().unverified).toBe(false)
+  })
+
+  it('confirmAccount: mesma conta limpa a pendência; outra conta marca a troca; falha mantém', async () => {
+    signInForTest('t1', undefined, ana)
+    useSessionStore.setState({ unverified: true })
+
+    stubApi({ 'GET /auth/me': { status: 503 } })
+    expect(await confirmAccount()).toBe('unverified')
+    expect(useSessionStore.getState().unverified).toBe(true)
+
+    stubApi({ 'GET /auth/me': { body: ana } })
+    expect(await confirmAccount()).toBe('renewed')
+    expect(useSessionStore.getState().unverified).toBe(false)
+
+    stubApi({ 'GET /auth/me': { body: bia } })
+    expect(await confirmAccount()).toBe('accountChanged')
+    expect(useSessionStore.getState()).toMatchObject({ user: bia, accountChanged: true })
+  })
+})
+
+describe('logoutAllSessions ("sair de todos os dispositivos")', () => {
+  it('chama POST /auth/logout-all com o cookie (a API o apaga) e limpa a sessão local', async () => {
+    signInForTest('t1', undefined, ana)
+    const { calls } = stubApi({ 'POST /auth/logout-all': { status: 204 } })
+
+    expect(await logoutAllSessions()).toBe('server')
+
+    const call = calls.find((c) => c.path === '/auth/logout-all')
+    expect(call?.credentials).toBe('include')
+    expect(call?.headers.get('Authorization')).toBe('Bearer t1')
+    expect(useSessionStore.getState()).toMatchObject({ token: null, user: null, expired: false })
+  })
+
+  it('com a API fora do ar, limpa a sessão local mesmo assim e informa', async () => {
+    signInForTest('t1', undefined, ana)
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    expect(await logoutAllSessions()).toBe('unreachable')
+    expect(useSessionStore.getState().token).toBeNull()
+  })
+
+  it('um refresh em voo não reabre a sessão', async () => {
+    signInForTest('t1', undefined, ana)
+    const refreshGate = gate()
+    stubApi({
+      'POST /auth/refresh': async () => {
+        await refreshGate.opened
+        return REFRESHED('t2')
+      },
+      'POST /auth/logout-all': { status: 204 },
+      'GET /auth/me': { body: ana },
+    })
+
+    const renewal = renewSession()
+    await logoutAllSessions()
+    refreshGate.open()
+
+    expect(await renewal).toBe('discarded')
+    expect(useSessionStore.getState().token).toBeNull()
   })
 })

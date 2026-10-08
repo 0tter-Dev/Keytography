@@ -1,5 +1,10 @@
 import createClient, { type Middleware } from 'openapi-fetch'
-import { endSessionAsExpired, renewSession } from '@/features/auth/session'
+import {
+  confirmAccount,
+  endSessionAsExpired,
+  renewSession,
+  type RenewResult,
+} from '@/features/auth/session'
 import { isSessionActive, useSessionStore } from '@/features/auth/session-store'
 import type { paths } from './schema'
 
@@ -23,9 +28,12 @@ const PUBLIC_PATHS = [
  */
 const NO_RENEWAL_PATHS = [...PUBLIC_PATHS, '/auth/logout', '/auth/me']
 
+/** Caminho base da API (ex.: `/api` quando ela fica atrás de um prefixo), sem a barra final. */
+const API_BASE_PATH = new URL(API_BASE_URL, globalThis.location?.origin).pathname.replace(/\/$/, '')
+
 function matches(request: Request, paths: string[]): boolean {
   const { pathname } = new URL(request.url)
-  return paths.some((path) => pathname.endsWith(path))
+  return paths.some((path) => pathname === API_BASE_PATH + path)
 }
 
 /** Antecedência mínima: abaixo disso o token é renovado antes de a chamada sair. */
@@ -35,6 +43,17 @@ const bearer = (token: string) => `Bearer ${token}`
 
 /** Cópia de cada requisição autenticada, para repeti-la uma vez depois de uma renovação. */
 const originals = new Map<string, Request>()
+
+/** Quantas cópias ainda estão guardadas e zerar o mapa. Só para os testes. */
+export const pendingRequestCount = () => originals.size
+export const resetClientRuntime = () => originals.clear()
+
+/**
+ * Resposta sintética para uma chamada que NÃO deve sair: depois de uma renovação a aba pode estar
+ * com o token de outra conta (ou sem saber de quem é), e enviar a chamada com ele levaria dados da
+ * conta anterior para a nova. Equivale ao 401 que o servidor daria, e o chamador trata igual.
+ */
+const refused = () => new Response(null, { status: 401 })
 
 /**
  * Sessão no cliente tipado (ADR-0006): anexa o access token (renovando-o antes se estiver para
@@ -50,13 +69,23 @@ const sessionMiddleware: Middleware = {
     }
 
     const before = useSessionStore.getState()
-    if (
-      before.restored &&
-      before.token !== null &&
-      (before.expiresAt ?? 0) - Date.now() < MIN_REMAINING_MS &&
-      !matches(request, NO_RENEWAL_PATHS)
-    ) {
-      await renewSession()
+    if (before.restored && before.token !== null && !matches(request, NO_RENEWAL_PATHS)) {
+      // Token para vencer: renova antes de sair. Conta ainda por conferir (renovação anterior sem
+      // `/auth/me`): confere antes de sair. Em ambos os casos, se a conta mudou ou segue
+      // desconhecida, a chamada não sai com o token novo.
+      let result: RenewResult = 'renewed'
+      if ((before.expiresAt ?? 0) - Date.now() < MIN_REMAINING_MS) {
+        result = await renewSession()
+      }
+      if (
+        (result === 'renewed' || result === 'unreachable') &&
+        useSessionStore.getState().unverified
+      ) {
+        result = await confirmAccount()
+      }
+      if (result === 'accountChanged' || result === 'unverified') {
+        return refused()
+      }
     }
 
     const session = useSessionStore.getState()
@@ -78,13 +107,10 @@ const sessionMiddleware: Middleware = {
 
     const sentWith = request.headers.get('Authorization')
     const current = useSessionStore.getState().token
-    // Sem sessão (logout em andamento ou sessão já encerrada): não há o que renovar.
-    if (current === null) {
-      return response
-    }
 
-    // Um 401 tardio de um token que já foi trocado: basta repetir com o token atual.
-    if (sentWith === bearer(current)) {
+    // Um 401 tardio de um token que já foi trocado: basta repetir com o token atual. Se o token
+    // enviado ainda é o atual, renova antes (sem sessão — logout em andamento — não há o que fazer).
+    if (current !== null && sentWith === bearer(current)) {
       const result = await renewSession()
       if (result !== 'renewed') {
         // `accountChanged`: a aba passa a mostrar outra conta; repetir devolveria dados dela para a
@@ -93,8 +119,8 @@ const sessionMiddleware: Middleware = {
       }
     }
 
-    const token = useSessionStore.getState().token
-    if (token === null) {
+    const { token, unverified } = useSessionStore.getState()
+    if (token === null || unverified) {
       return response
     }
     const retry = original.clone()

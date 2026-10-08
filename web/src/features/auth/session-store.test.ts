@@ -77,6 +77,33 @@ describe('useSessionStore', () => {
     expect(epoch()).toBe(start + 2)
   })
 
+  it('a conta por conferir (unverified) some ao ler a identidade e ao encerrar a sessão', () => {
+    useSessionStore.getState().signIn('jwt', inOneHour())
+    useSessionStore.getState().setUser(ana)
+
+    useSessionStore.setState({ unverified: true })
+    useSessionStore.getState().setUser(ana)
+    expect(useSessionStore.getState().unverified).toBe(false)
+
+    useSessionStore.setState({ unverified: true })
+    useSessionStore.getState().signOut()
+    expect(useSessionStore.getState().unverified).toBe(false)
+
+    useSessionStore.getState().signIn('jwt', inOneHour())
+    useSessionStore.setState({ unverified: true })
+    useSessionStore.getState().expire()
+    expect(useSessionStore.getState().unverified).toBe(false)
+  })
+
+  it('renovar o token (signIn) NÃO apaga a pendência de conferência', () => {
+    useSessionStore.getState().signIn('jwt-1', inOneHour())
+    useSessionStore.setState({ unverified: true })
+
+    useSessionStore.getState().signIn('jwt-2', inOneHour())
+
+    expect(useSessionStore.getState().unverified).toBe(true)
+  })
+
   it('isSessionActive rejeita token vencido', () => {
     expect(isSessionActive({ token: 'jwt', expiresAt: Date.now() - 1 })).toBe(false)
     expect(isSessionActive({ token: null, expiresAt: null })).toBe(false)

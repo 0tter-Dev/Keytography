@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { signInForTest, stubApi } from '@/test/api-stub'
-import { useCurrentUser } from './use-current-user'
+import { MAX_IDENTITY_ATTEMPTS, useCurrentUser } from './use-current-user'
 
 const ana = { id: 'u1', login: 'ana', email: 'ana@example.com', role: 'Member' }
 
@@ -60,5 +60,21 @@ describe('useCurrentUser', () => {
     await advance(20_000)
 
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('useCurrentUser: teto de tentativas', () => {
+  it('desiste depois de MAX_IDENTITY_ATTEMPTS leituras que falham', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1')
+    const { calls } = stubApi({ 'GET /auth/me': { status: 503 } })
+
+    render(<Who />)
+    for (let i = 0; i < MAX_IDENTITY_ATTEMPTS * 2; i++) {
+      await advance(15_001) // cada nova tentativa é agendada depois da anterior falhar
+    }
+
+    expect(calls).toHaveLength(MAX_IDENTITY_ATTEMPTS)
+    expect(screen.getByText('sem identidade')).toBeInTheDocument()
   })
 })
