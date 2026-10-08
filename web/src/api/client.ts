@@ -105,6 +105,11 @@ const sessionMiddleware: Middleware = {
     }
     return retried
   },
+
+  // Falha de rede: não há resposta, então `onResponse` nunca roda; solta a cópia guardada.
+  onError({ id }) {
+    originals.delete(id)
+  },
 }
 
 /**

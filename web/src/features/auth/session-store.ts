@@ -16,6 +16,8 @@ type SessionState = {
   restored: boolean
   /** `true` quando a conta mudou em outra aba/janela e o aviso ainda não foi mostrado. */
   accountChanged: boolean
+  /** Sobe a cada fim de sessão: um refresh iniciado numa época anterior é descartado ao chegar. */
+  epoch: number
   signIn: (token: string, expiresAt: string) => void
   setUser: (user: CurrentUser) => void
   markRestored: () => void
@@ -36,6 +38,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
   expired: false,
   restored: false,
   accountChanged: false,
+  epoch: 0,
   // Uma renovação (refresh) também passa por aqui: mantém o usuário já carregado.
   signIn: (token, expiresAt) =>
     set({ token, expiresAt: new Date(expiresAt).getTime(), expired: false, restored: true }),
@@ -47,23 +50,25 @@ export const useSessionStore = create<SessionState>()((set) => ({
   markRestored: () => set({ restored: true }),
   clearAccountChanged: () => set({ accountChanged: false }),
   signOut: () =>
-    set({
+    set((state) => ({
       token: null,
       expiresAt: null,
       user: null,
       expired: false,
       accountChanged: false,
       restored: true,
-    }),
+      epoch: state.epoch + 1,
+    })),
   expire: () =>
-    set({
+    set((state) => ({
       token: null,
       expiresAt: null,
       user: null,
       expired: true,
       accountChanged: false,
       restored: true,
-    }),
+      epoch: state.epoch + 1,
+    })),
 }))
 
 /** `true` se há token e ele ainda não venceu. */

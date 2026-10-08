@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router'
 import { AccountChangeNotice } from './AccountChangeNotice'
 import { loginRedirectTarget, type LoginRedirectState } from './redirect'
 import { SessionLoading } from './SessionLoading'
+import { settleRefresh } from './session'
 import { isSessionActive, useSessionStore } from './session-store'
 
 /** Maior atraso que `setTimeout` aceita (~24,8 dias). */
@@ -21,12 +22,23 @@ export function RequireAuth() {
   const active = isSessionActive({ token, expiresAt })
 
   // Rede de segurança: se o access token vence sem ter sido renovado (API fora do ar), encerra a
-  // sessão. A renovação normal acontece antes, no `SessionController`, e troca `expiresAt`.
+  // sessão. A renovação normal acontece antes, no `SessionController`, e troca `expiresAt`. Se uma
+  // renovação ainda está em voo no vencimento (ex.: o computador voltou de suspensão), espera por
+  // ela: derrubar a sessão agora a reabriria logo depois, sem usuário carregado.
   useEffect(() => {
     if (!active || expiresAt === null) {
       return
     }
-    const timer = setTimeout(expire, Math.min(expiresAt - Date.now(), MAX_TIMEOUT_MS))
+    const timer = setTimeout(
+      () => {
+        void settleRefresh().then(() => {
+          if (useSessionStore.getState().expiresAt === expiresAt) {
+            expire()
+          }
+        })
+      },
+      Math.min(expiresAt - Date.now(), MAX_TIMEOUT_MS),
+    )
     return () => clearTimeout(timer)
   }, [active, expiresAt, expire])
 

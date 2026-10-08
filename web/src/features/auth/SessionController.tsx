@@ -1,10 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { REFRESH_LEAD_MS, renewSession, restoreSession } from './session'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import {
+  MIN_RENEW_DELAY_MS,
+  REFRESH_LEAD_MS,
+  RETRY_AFTER_UNREACHABLE_MS,
+  renewSession,
+  restoreSession,
+} from './session'
 import { useSessionStore } from './session-store'
-
-/** Espera antes de tentar de novo quando a API não respondeu a uma renovação. */
-const RETRY_AFTER_UNREACHABLE_MS = 15_000
 
 /**
  * Orquestra a sessão no cliente. Não renderiza nada.
@@ -14,13 +19,19 @@ const RETRY_AFTER_UNREACHABLE_MS = 15_000
  *   sobrar em memória para o próximo. Renovações da MESMA conta não esvaziam nada.
  */
 export function SessionController() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const token = useSessionStore((state) => state.token)
   const expiresAt = useSessionStore((state) => state.expiresAt)
 
   useEffect(() => {
-    void restoreSession()
-  }, [])
+    void restoreSession().then((result) => {
+      if (result === 'unreachable') {
+        // `id` fixo: o StrictMode monta duas vezes e o aviso não deve duplicar.
+        toast.warning(t('auth.restoreUnreachable'), { id: 'restore-unreachable' })
+      }
+    })
+  }, [t])
 
   useEffect(
     () =>
@@ -46,12 +57,13 @@ export function SessionController() {
       timer = setTimeout(async () => {
         const result = await renewSession()
         // API fora do ar: o token atual ainda pode valer; tenta de novo em instantes.
+        // (`discarded`: a sessão terminou durante a renovação; não há o que reagendar.)
         if (!cancelled && result === 'unreachable') {
           schedule(RETRY_AFTER_UNREACHABLE_MS)
         }
       }, delay)
     }
-    schedule(Math.max(0, expiresAt - Date.now() - REFRESH_LEAD_MS))
+    schedule(Math.max(MIN_RENEW_DELAY_MS, expiresAt - Date.now() - REFRESH_LEAD_MS))
 
     return () => {
       cancelled = true

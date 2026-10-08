@@ -8,7 +8,7 @@ import ptBR from '@/i18n/locales/pt-BR.json'
 import { REFRESHED, signInForTest, stubApi } from '@/test/api-stub'
 import { renderRoutes } from '@/test/render'
 import { RequireAuth } from './guards'
-import { REFRESH_LEAD_MS } from './session'
+import { MIN_RENEW_DELAY_MS, REFRESH_LEAD_MS } from './session'
 import { useSessionStore } from './session-store'
 
 const { auth } = ptBR
@@ -17,8 +17,15 @@ const HEALTH = { 'GET /health': { body: { status: 'healthy', checks: [] } } }
 const inOneHour = () => new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
+
+/** Deixa as promessas e os temporizadores falsos (já vencidos) correrem até o fim. */
+const advance = (ms: number) =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(ms)
+  })
 
 async function fill(label: string, value: string) {
   await userEvent.type(screen.getByLabelText(label), value)
@@ -88,18 +95,21 @@ describe('rotas protegidas e sessão', () => {
   })
 
   it('a sessão se renova sozinha antes de o access token vencer, sem o usuário perceber', async () => {
-    // Vencimento em 30,3 s: a renovação é agendada para ~300 ms depois de abrir.
-    signInForTest('curto', REFRESH_LEAD_MS + 300, ME)
+    vi.useFakeTimers()
+    // A renovação é agendada para MIN_RENEW_DELAY_MS depois de abrir (piso do atraso).
+    signInForTest('curto', REFRESH_LEAD_MS + MIN_RENEW_DELAY_MS + 300, ME)
     const { calls } = stubApi({
       ...HEALTH,
       'GET /auth/me': { body: ME },
       'POST /auth/refresh': REFRESHED('renovado'),
     })
     renderRoutes(routes, '/')
-    expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
+    await advance(0)
+    expect(screen.getByText(ptBR.health.title)).toBeInTheDocument()
 
-    await waitFor(() => expect(useSessionStore.getState().token).toBe('renovado'))
+    await advance(MIN_RENEW_DELAY_MS + 400)
 
+    expect(useSessionStore.getState().token).toBe('renovado')
     expect(calls.filter((call) => call.path === '/auth/refresh')).toHaveLength(1)
     expect(screen.getByText(ptBR.health.title)).toBeInTheDocument() // continua na mesma tela
     expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
@@ -112,6 +122,40 @@ describe('rotas protegidas e sessão', () => {
 
     expect(await screen.findByRole('heading', { name: auth.login.title })).toBeInTheDocument()
     expect(screen.getByText(auth.login.sessionExpired)).toBeInTheDocument()
+  })
+
+  it('no vencimento, a rede de segurança espera um refresh em andamento em vez de derrubar a sessão', async () => {
+    vi.useFakeTimers()
+    // Vence em 40 s; a renovação começa em 10 s e só termina depois do vencimento (API lenta,
+    // ou computador que voltou de suspensão).
+    signInForTest('curto', 40_000, ME)
+    let finishRefresh: () => void = () => {}
+    const slowRefresh = new Promise<void>((resolve) => {
+      finishRefresh = resolve
+    })
+    stubApi({
+      'GET /auth/me': { body: ME },
+      'POST /auth/refresh': async () => {
+        await slowRefresh
+        return REFRESHED('renovado')
+      },
+    })
+    const guarded = [
+      { path: '/login', element: <p>tela de login</p> },
+      { element: <RequireAuth />, children: [{ path: '/', element: <p>area protegida</p> }] },
+    ]
+    renderRoutes(guarded, '/')
+
+    await advance(41_000) // passou do vencimento, com o refresh ainda pendente
+    expect(screen.getByText('area protegida')).toBeInTheDocument()
+    expect(useSessionStore.getState().expired).toBe(false)
+
+    finishRefresh()
+    await advance(0)
+
+    expect(useSessionStore.getState().token).toBe('renovado')
+    expect(screen.getByText('area protegida')).toBeInTheDocument()
+    expect(screen.queryByText('tela de login')).not.toBeInTheDocument()
   })
 
   it('logout chama a API, limpa a sessão local e torna as rotas protegidas inacessíveis', async () => {

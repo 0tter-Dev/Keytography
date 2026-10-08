@@ -62,6 +62,21 @@ describe('useSessionStore', () => {
     expect(useSessionStore.getState().accountChanged).toBe(false)
   })
 
+  it('cada fim de sessão (logout ou expiração) avança a época; entrar e renovar não', () => {
+    const epoch = () => useSessionStore.getState().epoch
+    const start = epoch()
+
+    useSessionStore.getState().signIn('jwt-1', inOneHour())
+    useSessionStore.getState().signIn('jwt-2', inOneHour())
+    expect(epoch()).toBe(start)
+
+    useSessionStore.getState().signOut()
+    expect(epoch()).toBe(start + 1)
+
+    useSessionStore.getState().expire()
+    expect(epoch()).toBe(start + 2)
+  })
+
   it('isSessionActive rejeita token vencido', () => {
     expect(isSessionActive({ token: 'jwt', expiresAt: Date.now() - 1 })).toBe(false)
     expect(isSessionActive({ token: null, expiresAt: null })).toBe(false)
