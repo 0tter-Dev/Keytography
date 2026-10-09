@@ -8,5 +8,5 @@ ADRs preservam decisões duráveis que afetam mais de uma capability. Não são 
 - [ADR-0002: Cache em memória da DEK por sessão](./ADR-0002-dek-session-cache.md)
 - [ADR-0003: Recálculo retroativo de avaliação de senha via decifragem em lote pela chave de recuperação](./ADR-0003-retroactive-evaluation-bulk-recovery-decrypt.md)
 - [ADR-0004: Contrato OpenAPI versionado como fonte dos clientes, com guarda contra drift](./ADR-0004-versioned-openapi-contract.md)
-- [ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend](./ADR-0005-client-session-model-and-backend-managed-sessions.md)
+- [ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend](./ADR-0005-client-session-model-and-backend-managed-sessions.md) — **substituído pelo ADR-0006**
 - [ADR-0006: Sessões gerenciadas pelo backend, com refresh em cookie `HttpOnly` e DEK atrelada à sessão](./ADR-0006-backend-managed-sessions.md)
