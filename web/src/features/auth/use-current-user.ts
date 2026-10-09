@@ -30,12 +30,15 @@ export function useCurrentUser() {
     let timer: ReturnType<typeof setTimeout> | undefined
     let cancelled = false
     void loadIdentity().then((loaded) => {
+      if (cancelled) {
+        return // efeito descartado (ex.: StrictMode monta duas vezes): a tentativa não conta
+      }
       if (loaded) {
         failures.current = 0
         return
       }
       failures.current += 1
-      if (!cancelled && failures.current < MAX_IDENTITY_ATTEMPTS) {
+      if (failures.current < MAX_IDENTITY_ATTEMPTS) {
         timer = setTimeout(() => setAttempt((count) => count + 1), RETRY_IDENTITY_MS)
       }
     })

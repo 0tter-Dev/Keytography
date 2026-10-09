@@ -27,6 +27,8 @@ const PUBLIC_PATHS = [
  * pela própria renovação: nenhum dos dois dispara renovação (evita esperar por si mesmo).
  */
 const NO_RENEWAL_PATHS = [...PUBLIC_PATHS, '/auth/logout', '/auth/me']
+// `/auth/logout-all` NÃO está na lista de propósito: é uma chamada autenticada comum, que precisa de
+// um token válido (renovado antes, ou repetido uma vez depois do 401) como qualquer outra.
 
 /** Caminho base da API (ex.: `/api` quando ela fica atrás de um prefixo), sem a barra final. */
 const API_BASE_PATH = new URL(API_BASE_URL, globalThis.location?.origin).pathname.replace(/\/$/, '')
@@ -41,8 +43,12 @@ const MIN_REMAINING_MS = 5_000
 
 const bearer = (token: string) => `Bearer ${token}`
 
-/** Cópia de cada requisição autenticada, para repeti-la uma vez depois de uma renovação. */
-const originals = new Map<string, Request>()
+/**
+ * Cópia de cada requisição autenticada, para repeti-la uma vez depois de uma renovação, com a
+ * sessão (`epoch`) e a conta (`accountVersion`) sob as quais ela saiu: se uma delas mudou até a
+ * resposta chegar, a chamada pertence a outra sessão/conta e NÃO é repetida.
+ */
+const originals = new Map<string, { request: Request; epoch: number; accountVersion: number }>()
 
 /** Quantas cópias ainda estão guardadas e zerar o mapa. Só para os testes. */
 export const pendingRequestCount = () => originals.size
@@ -92,7 +98,11 @@ const sessionMiddleware: Middleware = {
     if (isSessionActive(session)) {
       request.headers.set('Authorization', bearer(session.token!))
       if (!matches(request, NO_RENEWAL_PATHS)) {
-        originals.set(id, request.clone())
+        originals.set(id, {
+          request: request.clone(),
+          epoch: session.epoch,
+          accountVersion: session.accountVersion,
+        })
       }
     }
     return request
@@ -102,6 +112,17 @@ const sessionMiddleware: Middleware = {
     const original = originals.get(id)
     originals.delete(id)
     if (response.status !== 401 || !original) {
+      return response
+    }
+
+    // Logout/expiração ou troca de conta desde que a chamada saiu: ela pertence a outra sessão ou
+    // conta, então não se renova nem se repete nada por ela (repetir levaria a chamada de uma
+    // conta para a outra com o token novo).
+    const belongsToCurrent = () => {
+      const state = useSessionStore.getState()
+      return state.epoch === original.epoch && state.accountVersion === original.accountVersion
+    }
+    if (!belongsToCurrent()) {
       return response
     }
 
@@ -123,10 +144,12 @@ const sessionMiddleware: Middleware = {
     if (token === null || unverified) {
       return response
     }
-    const retry = original.clone()
+    const retry = original.request.clone()
     retry.headers.set('Authorization', bearer(token))
     const retried = await globalThis.fetch(retry)
-    if (retried.status === 401) {
+    // Só encerra a sessão se ela ainda é a mesma que fez a repetição (um logout e um novo login
+    // durante o voo tornariam este 401 irrelevante para a sessão nova).
+    if (retried.status === 401 && useSessionStore.getState().token === token) {
       endSessionAsExpired()
     }
     return retried

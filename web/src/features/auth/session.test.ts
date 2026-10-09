@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { REFRESHED, signInForTest, stubApi } from '@/test/api-stub'
 import {
-  REFRESH_TIMEOUT_MS,
   confirmAccount,
   loadIdentity,
   logoutAllSessions,
@@ -141,7 +140,7 @@ describe('tempo limite do refresh', () => {
     )
 
     const restoring = restoreSession()
-    await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS - 1)
+    await vi.advanceTimersByTimeAsync(19_999)
     expect(useSessionStore.getState().restored).toBe(false)
     await vi.advanceTimersByTimeAsync(2)
 
@@ -154,9 +153,40 @@ describe('tempo limite do refresh', () => {
     stubApi({ 'POST /auth/refresh': REFRESHED('t2'), 'GET /auth/me': { body: ana } })
 
     expect(await restoreSession()).toBe('renewed')
-    await vi.advanceTimersByTimeAsync(REFRESH_TIMEOUT_MS * 2)
+    await vi.advanceTimersByTimeAsync(40_000)
 
     expect(useSessionStore.getState().token).toBe('t2')
+  })
+})
+
+describe('tempo limite da conferência de conta', () => {
+  it('um /auth/me que nunca responde não trava a renovação: estourado o tempo, a conta fica por conferir', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1', undefined, ana)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: Request) => {
+        if (request.url.endsWith('/auth/refresh')) {
+          return Promise.resolve(
+            new Response(JSON.stringify(REFRESHED('t2').body), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }),
+          )
+        }
+        return new Promise<Response>((_resolve, reject) => {
+          request.signal.addEventListener('abort', () => reject(new TypeError('aborted')))
+        })
+      }),
+    )
+
+    const renewing = renewSession()
+    await vi.advanceTimersByTimeAsync(19_999)
+    expect(useSessionStore.getState().unverified).toBe(true)
+    await vi.advanceTimersByTimeAsync(2)
+
+    expect(await renewing).toBe('unverified')
+    expect(useSessionStore.getState()).toMatchObject({ token: 't2', unverified: true })
   })
 })
 

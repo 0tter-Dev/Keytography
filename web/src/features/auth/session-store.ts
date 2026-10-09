@@ -23,7 +23,13 @@ type SessionState = {
   unverified: boolean
   /** Sobe a cada fim de sessão: um refresh iniciado numa época anterior é descartado ao chegar. */
   epoch: number
-  signIn: (token: string, expiresAt: string) => void
+  /**
+   * Sobe quando a conta exibida muda para OUTRA (o usuário carregado troca de id). Uma chamada só é
+   * repetida depois de um 401 se a conta continua a mesma que a enviou.
+   */
+  accountVersion: number
+  /** `unverified`: o token vem de uma renovação e a conta dele ainda não foi conferida. */
+  signIn: (token: string, expiresAt: string, unverified?: boolean) => void
   setUser: (user: CurrentUser) => void
   markRestored: () => void
   clearAccountChanged: () => void
@@ -45,15 +51,27 @@ export const useSessionStore = create<SessionState>()((set) => ({
   accountChanged: false,
   unverified: false,
   epoch: 0,
-  // Uma renovação (refresh) também passa por aqui: mantém o usuário já carregado.
-  signIn: (token, expiresAt) =>
-    set({ token, expiresAt: new Date(expiresAt).getTime(), expired: false, restored: true }),
+  accountVersion: 0,
+  // Uma renovação (refresh) também passa por aqui: mantém o usuário já carregado, e como o token
+  // novo pode ser de outra conta (cookie compartilhado), já nasce `unverified` até a conferência.
+  signIn: (token, expiresAt, unverified = false) =>
+    set({
+      token,
+      expiresAt: new Date(expiresAt).getTime(),
+      expired: false,
+      restored: true,
+      unverified,
+    }),
   setUser: (user) =>
-    set((state) => ({
-      user,
-      unverified: false,
-      accountChanged: state.accountChanged || (state.user !== null && state.user.id !== user.id),
-    })),
+    set((state) => {
+      const switched = state.user !== null && state.user.id !== user.id
+      return {
+        user,
+        unverified: false,
+        accountChanged: state.accountChanged || switched,
+        accountVersion: state.accountVersion + (switched ? 1 : 0),
+      }
+    }),
   markRestored: () => set({ restored: true }),
   clearAccountChanged: () => set({ accountChanged: false }),
   signOut: () =>

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useSessionStore } from '@/features/auth/session-store'
 import { REFRESHED, signInForTest, stubApi, type StubbedCall } from '@/test/api-stub'
+import { logoutSession, renewSession } from '@/features/auth/session'
 import { api, pendingRequestCount } from './client'
 
 const ana = { id: 'u1', login: 'ana', email: 'ana@example.com', role: 'Member' }
@@ -403,5 +404,168 @@ describe('caminhos públicos', () => {
     await api.GET('/x/health' as never)
 
     expect(calls[0]?.headers.get('Authorization')).toBe('Bearer meu-jwt')
+  })
+})
+
+/** Resposta que só sai quando o teste mandar. */
+function gate() {
+  let open: () => void = () => {}
+  const opened = new Promise<void>((resolve) => {
+    open = resolve
+  })
+  return { opened, open }
+}
+
+describe('janelas concorrentes na troca de conta', () => {
+  it('uma chamada feita enquanto a conferência da conta renovada ainda voa espera por ela (outra conta: não sai)', async () => {
+    signInForTest('velho', undefined, ana)
+    const meGate = gate()
+    const { calls } = stubApi({
+      'GET /vault/entries': { body: [] },
+      'POST /auth/refresh': REFRESHED('da-bia'),
+      'GET /auth/me': async () => {
+        await meGate.opened
+        return { body: bia }
+      },
+    })
+
+    const renewing = renewSession()
+    await vi.waitFor(() => expect(useSessionStore.getState().token).toBe('da-bia'))
+    expect(useSessionStore.getState().unverified).toBe(true) // o token novo nasce por conferir
+    const pending = api.GET('/vault/entries')
+    meGate.open()
+
+    expect((await pending).response.status).toBe(401)
+    await renewing
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(0)
+  })
+
+  it('...e se a conta é a mesma, a chamada sai com o token novo', async () => {
+    signInForTest('velho', undefined, ana)
+    const meGate = gate()
+    const { calls } = stubApi({
+      'GET /vault/entries': { body: [] },
+      'POST /auth/refresh': REFRESHED('novo'),
+      'GET /auth/me': async () => {
+        await meGate.opened
+        return { body: ana }
+      },
+    })
+
+    const renewing = renewSession()
+    await vi.waitFor(() => expect(useSessionStore.getState().token).toBe('novo'))
+    const pending = api.GET('/vault/entries')
+    meGate.open()
+
+    expect((await pending).response.status).toBe(200)
+    await renewing
+    expect(calls.find((call) => call.path === '/vault/entries')?.headers.get('Authorization')).toBe(
+      'Bearer novo',
+    )
+  })
+
+  it('o 401 tardio de uma chamada da conta ANTERIOR não é repetido com o token da conta nova', async () => {
+    signInForTest('antigo', undefined, ana)
+    const lateGate = gate()
+    let sent = 0
+    const { calls } = stubApi({
+      'GET /vault/entries': async (call) => {
+        if (call.headers.get('Authorization') !== 'Bearer antigo') {
+          return { body: [{ dono: 'bia' }] } // o que uma repetição indevida receberia
+        }
+        if (++sent === 2) {
+          await lateGate.opened // a segunda chamada da ana só responde depois da troca de conta
+        }
+        return { status: 401 }
+      },
+      'POST /auth/refresh': REFRESHED('da-bia'),
+      'GET /auth/me': { body: bia },
+    })
+
+    const first = api.GET('/vault/entries')
+    const second = api.GET('/vault/entries')
+    expect((await first).response.status).toBe(401) // renovou e detectou a troca para a bia
+    expect(useSessionStore.getState().accountChanged).toBe(true)
+    lateGate.open()
+    const late = await second
+
+    expect(late.response.status).toBe(401)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(2) // nenhuma repetição com 'da-bia'
+  })
+})
+
+describe('chamadas de uma sessão que já terminou', () => {
+  it('um 401 que chega depois de o logout começar não renova nem repete nada', async () => {
+    signInForTest('t1', undefined, ana)
+    const lateGate = gate()
+    const { calls } = stubApi({
+      'GET /vault/entries': async () => {
+        await lateGate.opened
+        return { status: 401 }
+      },
+      'POST /auth/logout': { status: 204 },
+      'POST /auth/refresh': REFRESHED('t2'),
+      'GET /auth/me': { body: ana },
+    })
+
+    const pending = api.GET('/vault/entries')
+    await vi.waitFor(() => expect(countOf(calls, 'GET', '/vault/entries')).toBe(1))
+    const loggingOut = logoutSession()
+    lateGate.open()
+
+    expect((await pending).response.status).toBe(401)
+    await loggingOut
+    expect(countOf(calls, 'POST', '/auth/refresh')).toBe(0)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(1)
+  })
+
+  it('o 401 de uma repetição antiga não derruba a sessão NOVA (logout + novo login durante o voo)', async () => {
+    signInForTest('velho', undefined, ana)
+    const retryGate = gate()
+    const { calls } = stubApi({
+      'GET /vault/entries': async (call) => {
+        if (call.headers.get('Authorization') === 'Bearer velho') {
+          return { status: 401 }
+        }
+        await retryGate.opened // a repetição (token renovado) fica em voo
+        return { status: 401 }
+      },
+      'POST /auth/refresh': REFRESHED('renovado'),
+      'GET /auth/me': { body: ana },
+      'POST /auth/logout': { status: 204 },
+    })
+
+    const pending = api.GET('/vault/entries')
+    await vi.waitFor(() => expect(useSessionStore.getState().token).toBe('renovado'))
+    await vi.waitFor(() => expect(countOf(calls, 'GET', '/vault/entries')).toBe(2))
+    await logoutSession()
+    signInForTest('login-novo', undefined, ana)
+    retryGate.open()
+    await pending
+
+    expect(useSessionStore.getState()).toMatchObject({ token: 'login-novo', expired: false })
+    expect(countOf(calls, 'POST', '/auth/logout')).toBe(1) // só o logout explícito
+  })
+})
+
+describe('base da API com prefixo', () => {
+  it('compara os caminhos públicos já com o prefixo (/api/health é público; /api/vault/entries leva o token)', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:5247/api')
+    const { api: prefixed } = await import('./client')
+    const { useSessionStore: store } = await import('@/features/auth/session-store')
+    store.getState().signIn('meu-jwt', new Date(Date.now() + 60_000).toISOString())
+    store.getState().markRestored()
+    const { calls } = stubApi({
+      'GET /api/health': { body: {} },
+      'GET /api/vault/entries': { body: [] },
+    })
+
+    await prefixed.GET('/health')
+    await prefixed.GET('/vault/entries')
+
+    expect(calls[0]?.headers.has('Authorization')).toBe(false)
+    expect(calls[1]?.headers.get('Authorization')).toBe('Bearer meu-jwt')
+    vi.unstubAllEnvs()
   })
 })

@@ -95,13 +95,28 @@ describe('useSessionStore', () => {
     expect(useSessionStore.getState().unverified).toBe(false)
   })
 
-  it('renovar o token (signIn) NÃO apaga a pendência de conferência', () => {
+  it('signIn entra conferido por padrão; uma renovação com conta exibida entra por conferir', () => {
     useSessionStore.getState().signIn('jwt-1', inOneHour())
-    useSessionStore.setState({ unverified: true })
+    expect(useSessionStore.getState().unverified).toBe(false)
 
-    useSessionStore.getState().signIn('jwt-2', inOneHour())
-
+    useSessionStore.getState().signIn('jwt-2', inOneHour(), true)
     expect(useSessionStore.getState().unverified).toBe(true)
+
+    useSessionStore.getState().signIn('jwt-3', inOneHour())
+    expect(useSessionStore.getState().unverified).toBe(false)
+  })
+
+  it('a versão da conta só sobe quando o usuário exibido muda para OUTRO', () => {
+    const version = () => useSessionStore.getState().accountVersion
+    const start = version()
+    useSessionStore.getState().signIn('jwt', inOneHour())
+
+    useSessionStore.getState().setUser(ana) // primeira carga
+    useSessionStore.getState().setUser(ana) // mesma conta
+    expect(version()).toBe(start)
+
+    useSessionStore.getState().setUser(bia)
+    expect(version()).toBe(start + 1)
   })
 
   it('isSessionActive rejeita token vencido', () => {

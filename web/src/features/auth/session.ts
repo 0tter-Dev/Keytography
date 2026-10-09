@@ -27,8 +27,11 @@ export const MAX_SHORT_RENEWALS = 5
 /** Espera antes de tentar de novo quando a API não respondeu a uma renovação. */
 export const RETRY_AFTER_UNREACHABLE_MS = 15_000
 
-/** Tempo máximo de um `POST /auth/refresh`; sem isso um servidor mudo travaria toda renovação. */
-export const REFRESH_TIMEOUT_MS = 20_000
+/**
+ * Tempo máximo de cada chamada de sessão (`POST /auth/refresh`, `GET /auth/me`); sem isso um
+ * servidor mudo travaria toda renovação e toda conferência de conta.
+ */
+export const SESSION_REQUEST_TIMEOUT_MS = 20_000
 
 /** `discarded`: a sessão terminou (logout/expiração) enquanto o refresh voava; a resposta é ignorada. */
 type RefreshOutcome = 'renewed' | 'rejected' | 'unreachable' | 'discarded'
@@ -77,20 +80,31 @@ function refreshToken(): Promise<RefreshOutcome> {
   return refreshInflight.promise
 }
 
-async function requestRefresh(epoch: number): Promise<RefreshOutcome> {
+/** Executa `run` com um sinal que aborta depois de `SESSION_REQUEST_TIMEOUT_MS`. */
+async function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), SESSION_REQUEST_TIMEOUT_MS)
   try {
-    const { data, response } = await api.POST('/auth/refresh', {
-      credentials: 'include',
-      signal: controller.signal,
-    })
+    return await run(controller.signal)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function requestRefresh(epoch: number): Promise<RefreshOutcome> {
+  try {
+    const { data, response } = await withTimeout((signal) =>
+      api.POST('/auth/refresh', { credentials: 'include', signal }),
+    )
     // Logout/expiração durante o voo: aceitar a resposta ressuscitaria uma sessão já encerrada.
     if (useSessionStore.getState().epoch !== epoch) {
       return 'discarded'
     }
     if (response.ok && data) {
-      useSessionStore.getState().signIn(data.token, data.expiresAt)
+      // Se a aba já mostra uma conta, o token novo só vale para ela depois da conferência
+      // (`checkAccount`): até lá nenhuma chamada autenticada sai com ele.
+      const hadUser = useSessionStore.getState().user !== null
+      useSessionStore.getState().signIn(data.token, data.expiresAt, hadUser)
       return 'renewed'
     }
     // 401: cookie ausente, desconhecido ou de sessão encerrada. Outros status (403 de Origin,
@@ -98,8 +112,6 @@ async function requestRefresh(epoch: number): Promise<RefreshOutcome> {
     return response.status === 401 ? 'rejected' : 'unreachable'
   } catch {
     return 'unreachable'
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -114,7 +126,7 @@ function fetchIdentity(): Promise<CurrentUser | null> {
       key: token,
       promise: (async (): Promise<CurrentUser | null> => {
         try {
-          const { data } = await api.GET('/auth/me')
+          const { data } = await withTimeout((signal) => api.GET('/auth/me', { signal }))
           return useSessionStore.getState().token === token ? (data ?? null) : null
         } catch {
           return null
@@ -197,11 +209,9 @@ export async function renewSession({ restoring = false } = {}): Promise<RenewRes
   if (check === 'changed') {
     return 'accountChanged'
   }
-  if (check === 'unknown' && hadUser) {
-    useSessionStore.setState({ unverified: true })
-    return 'unverified'
-  }
-  return 'renewed'
+  // `unverified` já foi marcado quando o token novo entrou (`requestRefresh`) e só sai com uma
+  // leitura bem-sucedida da conta.
+  return check === 'unknown' && hadUser ? 'unverified' : 'renewed'
 }
 
 /**

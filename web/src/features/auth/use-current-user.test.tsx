@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { signInForTest, stubApi } from '@/test/api-stub'
 import { MAX_IDENTITY_ATTEMPTS, useCurrentUser } from './use-current-user'
@@ -76,5 +77,22 @@ describe('useCurrentUser: teto de tentativas', () => {
 
     expect(calls).toHaveLength(MAX_IDENTITY_ATTEMPTS)
     expect(screen.getByText('sem identidade')).toBeInTheDocument()
+  })
+
+  it('em StrictMode (efeito montado duas vezes) o teto continua sendo de 5 leituras reais', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1')
+    const { calls } = stubApi({ 'GET /auth/me': { status: 503 } })
+
+    render(
+      <StrictMode>
+        <Who />
+      </StrictMode>,
+    )
+    for (let i = 0; i < MAX_IDENTITY_ATTEMPTS * 2; i++) {
+      await advance(15_001)
+    }
+
+    expect(calls).toHaveLength(MAX_IDENTITY_ATTEMPTS)
   })
 })
