@@ -569,3 +569,99 @@ describe('base da API com prefixo', () => {
     vi.unstubAllEnvs()
   })
 })
+
+describe('401 tardio com a conta do token novo ainda por conferir', () => {
+  it('mesma conta: a chamada espera a conferência e é repetida (o usuário não percebe)', async () => {
+    signInForTest('antigo', undefined, ana)
+    const lateGate = gate()
+    const meGate = gate()
+    let sentWithOld = 0
+    const { calls } = stubApi({
+      'GET /vault/entries': async (call) => {
+        if (call.headers.get('Authorization') !== 'Bearer antigo') {
+          return { body: [] }
+        }
+        if (++sentWithOld === 2) {
+          await lateGate.opened
+        }
+        return { status: 401 }
+      },
+      'POST /auth/refresh': REFRESHED('novo'),
+      'GET /auth/me': async () => {
+        await meGate.opened
+        return { body: ana }
+      },
+    })
+
+    const first = api.GET('/vault/entries')
+    const second = api.GET('/vault/entries')
+    await vi.waitFor(() => expect(useSessionStore.getState().unverified).toBe(true)) // renovou; conferência em voo
+    lateGate.open() // o 401 da segunda chega dentro dessa janela
+    await vi.waitFor(() => expect(countOf(calls, 'GET', '/vault/entries')).toBe(2))
+    meGate.open()
+
+    expect((await first).response.status).toBe(200)
+    expect((await second).response.status).toBe(200)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(4) // 2 com o token antigo + 2 repetições
+  })
+})
+
+describe('sessão ou conta que mudam enquanto a renovação ainda confere', () => {
+  it('aba sem conta conhecida: logout + novo login durante a conferência impedem a repetição com o token do novo login', async () => {
+    signInForTest('velho') // sem usuário carregado: não há conta para comparar
+    const meGate = gate()
+    const { calls } = stubApi({
+      'GET /vault/entries': { status: 401 },
+      'POST /auth/refresh': REFRESHED('renovado'),
+      'GET /auth/me': async () => {
+        await meGate.opened
+        return { body: ana }
+      },
+      'POST /auth/logout': { status: 204 },
+    })
+
+    const pending = api.GET('/vault/entries')
+    await vi.waitFor(() => expect(countOf(calls, 'GET', '/auth/me')).toBe(1)) // renovou; conferindo
+    await logoutSession()
+    signInForTest('login-novo', undefined, ana)
+    meGate.open()
+    await pending
+
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(1) // nenhuma repetição com 'login-novo'
+  })
+})
+
+describe('carimbos de sessão e conta nas chamadas', () => {
+  it('depois de logouts e trocas de conta anteriores, uma chamada com 401 ainda é repetida (o carimbo é o valor atual)', async () => {
+    useSessionStore.setState({ epoch: 3, accountVersion: 2 }) // histórico: sessões e contas anteriores
+    signInForTest('velho', undefined, ana)
+    const { calls } = stubApi({
+      'GET /vault/entries': protectedBy('novo'),
+      'POST /auth/refresh': REFRESHED('novo'),
+      'GET /auth/me': { body: ana },
+    })
+
+    const { response } = await api.GET('/vault/entries')
+
+    expect(response.status).toBe(200)
+    expect(countOf(calls, 'GET', '/vault/entries')).toBe(2)
+  })
+})
+
+describe('/auth/logout-all é uma chamada autenticada comum', () => {
+  it('com o token prestes a vencer, renova antes de sair (diferente de /auth/logout)', async () => {
+    signInForTest('quase-vencendo', 1_000, ana)
+    const { calls } = stubApi({
+      'POST /auth/logout-all': { status: 204 },
+      'POST /auth/refresh': REFRESHED('novo'),
+      'GET /auth/me': { body: ana },
+    })
+
+    await api.POST('/auth/logout-all')
+
+    expect(countOf(calls, 'POST', '/auth/refresh')).toBe(1)
+    expect(
+      calls.find((call) => call.path === '/auth/logout-all')?.headers.get('Authorization'),
+    ).toBe('Bearer novo')
+  })
+})

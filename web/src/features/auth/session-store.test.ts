@@ -119,6 +119,19 @@ describe('useSessionStore', () => {
     expect(version()).toBe(start + 1)
   })
 
+  it('o aviso de troca de conta é pegajoso: continua pendente até ser consumido, mesmo com novas leituras da conta', () => {
+    useSessionStore.getState().signIn('jwt', inOneHour())
+    useSessionStore.getState().setUser(ana)
+    useSessionStore.getState().setUser(bia)
+    expect(useSessionStore.getState().accountChanged).toBe(true)
+
+    useSessionStore.getState().setUser(bia) // outra leitura da MESMA conta nova
+    expect(useSessionStore.getState().accountChanged).toBe(true)
+
+    useSessionStore.getState().clearAccountChanged()
+    expect(useSessionStore.getState().accountChanged).toBe(false)
+  })
+
   it('isSessionActive rejeita token vencido', () => {
     expect(isSessionActive({ token: 'jwt', expiresAt: Date.now() - 1 })).toBe(false)
     expect(isSessionActive({ token: null, expiresAt: null })).toBe(false)

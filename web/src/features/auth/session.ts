@@ -241,17 +241,19 @@ export async function restoreSession(): Promise<RenewResult | null> {
 }
 
 /**
- * Encerra a sessão pela API e então limpa o estado local, mesmo se a API não responde (resultado
- * `unreachable`). Um refresh em voo não pode reabrir a sessão que está sendo encerrada.
+ * Encerra a sessão pela API (com tempo limite) e então limpa o estado local, mesmo se a API não
+ * responde (resultado `unreachable`: rede, tempo esgotado, 403 de origem, 5xx). Um 401 significa
+ * que a sessão já não existe no servidor (por exemplo, encerrada em outra aba): conta como
+ * `server`, sem alarme. Um refresh em voo não pode reabrir a sessão que está sendo encerrada.
  */
 async function endSessionVia(
-  call: () => Promise<{ response: Response }>,
+  call: (signal: AbortSignal) => Promise<{ response: Response }>,
 ): Promise<'server' | 'unreachable'> {
   let result: 'server' | 'unreachable' = 'server'
   useSessionStore.setState((state) => ({ epoch: state.epoch + 1 }))
   try {
-    const { response } = await call()
-    if (!response.ok) {
+    const { response } = await withTimeout(call)
+    if (!response.ok && response.status !== 401) {
       result = 'unreachable'
     }
   } catch {
@@ -263,7 +265,7 @@ async function endSessionVia(
 
 /** Logout real: a API revoga a sessão e remove a DEK dela; depois o estado local é limpo. */
 export function logoutSession(): Promise<'server' | 'unreachable'> {
-  return endSessionVia(() => api.POST('/auth/logout', { credentials: 'include' }))
+  return endSessionVia((signal) => api.POST('/auth/logout', { credentials: 'include', signal }))
 }
 
 /**
@@ -272,7 +274,7 @@ export function logoutSession(): Promise<'server' | 'unreachable'> {
  * `keytography-012`.
  */
 export function logoutAllSessions(): Promise<'server' | 'unreachable'> {
-  return endSessionVia(() => api.POST('/auth/logout-all', { credentials: 'include' }))
+  return endSessionVia((signal) => api.POST('/auth/logout-all', { credentials: 'include', signal }))
 }
 
 /**

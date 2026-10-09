@@ -176,7 +176,7 @@ Roteiro repetível (o usado na verificação manual do `keytography-017`), com u
 3. Recarregue a página (F5): continua logado, e a aba **Network** mostra `POST /auth/refresh` no carregamento, seguido de `GET /auth/me`.
 4. Espere cerca de 30 s com a aba aberta: aparecem `POST /auth/refresh` e `GET /auth/me` sem a tela mudar, repetidos a cada ~30 s.
 5. Clique em **Sair**: `POST /auth/logout` responde 204 e a interface vai ao login; F5 depois disso recebe 401 em `/auth/refresh` e fica no login, sem aviso de expiração.
-6. O access token **antigo** deixa de valer depois do logout (a interface não expõe o token, então confira com curl):
+6. Complemento (não é o logout da interface do passo 5, que usa o seu próprio cookie): o access token **antigo** deixa de valer depois do logout. A interface não expõe o token, então prove o comportamento do servidor com uma sessão de curl:
 
    ```bash
    B=http://localhost:5247; H='content-type: application/json'

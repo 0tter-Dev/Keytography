@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useSessionStore } from './session-store'
 import { signInForTest, stubApi } from '@/test/api-stub'
 import { MAX_IDENTITY_ATTEMPTS, useCurrentUser } from './use-current-user'
 
@@ -94,5 +95,43 @@ describe('useCurrentUser: teto de tentativas', () => {
     }
 
     expect(calls).toHaveLength(MAX_IDENTITY_ATTEMPTS)
+  })
+
+  it('depois de uma falha, só tenta de novo ao passar 15 s (não antes)', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1')
+    const { calls } = stubApi({ 'GET /auth/me': { status: 503 } })
+
+    render(<Who />)
+    await advance(14_000)
+    expect(calls).toHaveLength(1)
+    await advance(1_100)
+
+    expect(calls).toHaveLength(2)
+  })
+
+  it('o contador de tentativas recomeça depois que a identidade carrega e depois de um novo login', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1')
+    let up = false
+    const { calls } = stubApi({ 'GET /auth/me': () => (up ? { body: ana } : { status: 503 }) })
+    render(<Who />)
+    await advance(0) // 1ª leitura (falha)
+    for (let i = 0; i < MAX_IDENTITY_ATTEMPTS - 2; i++) {
+      await advance(15_001) // mais 3 falhas: 4 no total
+    }
+    up = true
+    await advance(15_001) // a 5ª leitura carrega
+    expect(screen.getByText('ana')).toBeInTheDocument()
+    const afterLoad = calls.length
+
+    act(() => useSessionStore.getState().signOut())
+    up = false
+    act(() => signInForTest('t2'))
+    for (let i = 0; i < MAX_IDENTITY_ATTEMPTS * 2; i++) {
+      await advance(15_001)
+    }
+
+    expect(calls.length - afterLoad).toBe(MAX_IDENTITY_ATTEMPTS) // 5 novas tentativas, não 1
   })
 })

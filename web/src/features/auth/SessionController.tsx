@@ -47,7 +47,6 @@ export function SessionController() {
         const accountSwitched =
           previous.user !== null && state.user !== null && previous.user.id !== state.user.id
         if (ended) {
-          void queryClient.cancelQueries()
           queryClient.clear()
         } else if (accountSwitched) {
           // `clear()` não alcança telas já montadas: elas continuariam exibindo o dado da conta

@@ -138,10 +138,17 @@ const sessionMiddleware: Middleware = {
         // tela da anterior. Rejeitada/inalcançável: a sessão já foi tratada pelo `renewSession`.
         return response
       }
+    } else if (current !== null && useSessionStore.getState().unverified) {
+      // 401 tardio de um token já trocado, cuja conta ainda está sendo conferida: espera a conferência
+      // em vez de devolver 401 à toa (mesma conta) ou repetir com o token de outra conta.
+      if ((await confirmAccount()) !== 'renewed') {
+        return response
+      }
     }
 
+    // Renovação e conferência são assíncronas: a sessão ou a conta podem ter mudado nesse intervalo.
     const { token, unverified } = useSessionStore.getState()
-    if (token === null || unverified) {
+    if (token === null || unverified || !belongsToCurrent()) {
       return response
     }
     const retry = original.request.clone()

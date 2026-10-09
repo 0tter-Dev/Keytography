@@ -34,8 +34,7 @@ export function useCurrentUser() {
         return // efeito descartado (ex.: StrictMode monta duas vezes): a tentativa não conta
       }
       if (loaded) {
-        failures.current = 0
-        return
+        return // `user` passa a existir e o efeito zera o contador
       }
       failures.current += 1
       if (failures.current < MAX_IDENTITY_ATTEMPTS) {

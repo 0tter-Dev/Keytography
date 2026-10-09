@@ -350,3 +350,61 @@ describe('logoutAllSessions ("sair de todos os dispositivos")', () => {
     expect(useSessionStore.getState().token).toBeNull()
   })
 })
+
+describe('encerramento da sessão: tempo limite e tipos de resposta', () => {
+  const silentServer = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (request: Request) =>
+          new Promise<Response>((_resolve, reject) => {
+            request.signal.addEventListener('abort', () => reject(new TypeError('aborted')))
+          }),
+      ),
+    )
+
+  it('logout com o servidor mudo: depois de 20 s limpa o estado local e informa que não avisou o servidor', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1', undefined, ana)
+    silentServer()
+
+    const loggingOut = logoutSession()
+    await vi.advanceTimersByTimeAsync(19_999)
+    expect(useSessionStore.getState().token).toBe('t1')
+    await vi.advanceTimersByTimeAsync(2)
+
+    expect(await loggingOut).toBe('unreachable')
+    expect(useSessionStore.getState().token).toBeNull()
+  })
+
+  it('logout-all com o servidor mudo: o mesmo tempo limite', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1', undefined, ana)
+    silentServer()
+
+    const loggingOut = logoutAllSessions()
+    await vi.advanceTimersByTimeAsync(20_001)
+
+    expect(await loggingOut).toBe('unreachable')
+    expect(useSessionStore.getState().token).toBeNull()
+  })
+
+  it('401 (a sessão já não existe no servidor, ex.: encerrada em outra aba) conta como servidor avisado, sem alarme', async () => {
+    signInForTest('t1', undefined, ana)
+    stubApi({ 'POST /auth/logout-all': { status: 401 }, 'POST /auth/refresh': { status: 401 } })
+
+    expect(await logoutAllSessions()).toBe('server')
+    expect(useSessionStore.getState().token).toBeNull()
+  })
+
+  it.each([403, 500, 503])(
+    '%i do servidor: o estado local é limpo, mas informa que a sessão pode continuar',
+    async (status) => {
+      signInForTest('t1', undefined, ana)
+      stubApi({ 'POST /auth/logout': { status } })
+
+      expect(await logoutSession()).toBe('unreachable')
+      expect(useSessionStore.getState().token).toBeNull()
+    },
+  )
+})

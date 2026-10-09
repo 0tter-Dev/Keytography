@@ -327,6 +327,73 @@ describe('SessionController', () => {
     })
   })
 
+  describe('timers e consultas em voo', () => {
+    it('uma renovação que termina depois de o efeito ser refeito não duplica o agendamento', async () => {
+      vi.useFakeTimers()
+      let gateOpen: () => void = () => {}
+      const refreshGate = new Promise<void>((resolve) => {
+        gateOpen = resolve
+      })
+      let n = 0
+      const { calls } = stubApi({
+        'POST /auth/refresh': async () => {
+          if (++n === 1) {
+            await refreshGate // a 1ª renovação demora; as seguintes falham de imediato
+          }
+          return { status: 503 }
+        },
+        'GET /auth/me': { body: ana },
+      })
+      signInForTest('t1', 90_000, ana)
+      setup()
+      const refreshes = () => calls.filter((call) => call.path === '/auth/refresh').length
+
+      await advance(90_000 - REFRESH_LEAD_MS + 1) // 1ª renovação dispara e fica em voo
+      expect(refreshes()).toBe(1)
+      act(() => useSessionStore.setState({ unverified: true })) // refaz o efeito (o antigo é cancelado)
+      act(() => useSessionStore.setState({ unverified: false }))
+      gateOpen() // a renovação antiga termina "unreachable": NÃO pode agendar outra tentativa
+      await advance(RETRY_AFTER_UNREACHABLE_MS * 4)
+
+      // Só a cadeia do efeito novo: 1 (em voo) + uma tentativa a cada 15 s a partir da primeira do efeito novo.
+      const cadence = refreshes() - 1
+      expect(cadence).toBeLessThanOrEqual(5)
+      expect(cadence).toBeGreaterThanOrEqual(3)
+    })
+
+    it('no fim da sessão, uma consulta em voo é cancelada e não repovoa a tela com dados do usuário que saiu', async () => {
+      stubApi({})
+      act(() => signInForTest('t1', undefined, ana))
+      let finish: (value: string) => void = () => {}
+      const client = new QueryClient()
+      function Screen() {
+        const { data } = useQuery({
+          queryKey: ['tela'],
+          queryFn: () =>
+            new Promise<string>((resolve) => {
+              finish = resolve
+            }),
+        })
+        return <p>{data ?? 'carregando'}</p>
+      }
+      render(
+        <QueryClientProvider client={client}>
+          <SessionController />
+          <Screen />
+        </QueryClientProvider>,
+      )
+      await vi.waitFor(() => expect(client.isFetching()).toBe(1))
+
+      act(() => useSessionStore.getState().signOut())
+      await act(async () => {
+        finish('dados da ana')
+        await Promise.resolve()
+      })
+
+      expect(screen.queryByText('dados da ana')).not.toBeInTheDocument()
+    })
+  })
+
   describe('restauração ao abrir a aplicação', () => {
     it('API fora do ar: avisa e libera a tela, sem sessão', async () => {
       const warn = vi.spyOn(toast, 'warning')
