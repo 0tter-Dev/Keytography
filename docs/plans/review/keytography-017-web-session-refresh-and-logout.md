@@ -87,6 +87,39 @@ Ajustes de meio, sem alterar o objetivo nem os critérios de aceite. Dois diverg
 - Verificação manual no navegador contra a API local (cookies `HttpOnly` não são visíveis ao script; conferir no painel de rede e nas ferramentas de armazenamento).
 - `project-audit` antes do merge, em subagente.
 
+## Invariants And Failure Modes
+
+Invariantes (consolidadas das rodadas de `project-audit`; as decisões de sessão estão no ADR-0006, item 13):
+
+- **O access token só vive em memória**; nada de credencial em `localStorage`/`sessionStorage`.
+- **Fim de sessão (logout/expiração) nunca é desfeito por uma resposta tardia:** um refresh em voo é descartado (época da sessão).
+- **Nenhuma chamada autenticada sai nem é repetida com o token de outra conta**, enquanto a aba conhece a conta exibida: o token renovado nasce *por conferir*; chamadas esperam a conferência; a repetição depois de 401 exige a mesma sessão (época) e a mesma conta (versão). Exceções: `GET /auth/me` e `POST /auth/logout` (por cookie).
+- **Cada chamada de sessão tem tempo limite** (refresh, `/auth/me`, logout, logout-all: 20 s); nada espera para sempre.
+- **Renovação em segundo plano não entra em laço** (piso, dobra do intervalo, desistência) e a sessão só cai por 401 do refresh ou por vencimento sem renovação.
+- **Cache de consultas:** esvaziado no fim da sessão, redefinido na troca de conta, intocado na renovação da mesma conta.
+
+Modos de falha cobertos: refresh lento/mudo, `/auth/me` falhando, API fora do ar na restauração, logout com API fora, 401 persistente (cofre sem DEK), logout durante refresh, troca de conta com chamadas em voo, StrictMode, computador voltando de suspensão.
+
+## Known Limitations
+
+- Um relógio do dispositivo adiantado por mais que a vida útil do token inutiliza a sessão (o cliente não tem o horário do servidor).
+- `POST /auth/logout` sai com o cookie mesmo com a conta por conferir: um "Sair" numa aba defasada encerra a sessão da conta ativa no navegador ("um navegador, uma sessão").
+- Logout não é sincronizado entre abas em tempo real (`BroadcastChannel`, fora do escopo).
+- Se `/auth/me` falha de forma persistente depois de uma renovação, a aba recusa chamadas autenticadas até a conferência dar certo ou o token vencer.
+- O critério "reinício da API leva ao login ao tocar no cofre" só tem teste automatizado (não há tela de cofre até o `009`).
+
+## Verification Matrix
+
+| Invariante ou critério | Teste | Prova de que o teste falha sem o comportamento |
+| --- | --- | --- |
+| Token fora de storage | `auth-flows.test.tsx` | mutação conferida (token em storage) |
+| Resposta tardia não reabre a sessão | `session.test.ts` (refresh em voo × logout/expiração) | mutação: sem checagem de época |
+| Chamada não sai com o token de outra conta | `client.test.ts` (janelas concorrentes, `unverified`) | mutações: sem `unverified` no `signIn`, sem recusa no `onRequest` |
+| 401 tardio não repete na conta/sessão errada | `client.test.ts` (carimbos de época e versão) | mutações: sem `accountVersion`/`epoch` |
+| Tempo limite nas chamadas de sessão | `session.test.ts` (refresh, `/auth/me`, logout) | mutação: sem `withTimeout` |
+| Sem laço de renovação | `SessionController.test.tsx` | mutações: sem piso, sem dobra, sem desistência |
+| Cache redefinido na troca de conta | `SessionController.test.tsx` (tela montada) | mutação: `clear()` no lugar de `resetQueries()` |
+
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: substituir a descrição de sessão (JWT em `sessionStorage`, logout local) pelo novo modelo (access token em memória, refresh por cookie, restauração, single-flight, logout real).
