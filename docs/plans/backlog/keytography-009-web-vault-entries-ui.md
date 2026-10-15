@@ -63,6 +63,42 @@ Implementar a experiência central do produto: listar, criar, editar, excluir (l
 - Verificação manual do CRUD completo contra a API local, incluindo lixeira e histórico.
 - CI permanece verde.
 
+## Invariants And Failure Modes
+
+*Rascunho: confirmar/ajustar na aprovação do plano.*
+
+Invariantes (devem valer sempre):
+
+- **Nenhum segredo fora da memória da aba:** senha e demais campos sensíveis nunca vão para `localStorage`/`sessionStorage`/URL/título da página/logs; a senha só está no DOM enquanto visível (oculta por padrão).
+- **Fim de sessão ou troca de conta limpa a tela:** nenhum valor revelado ou rascunho permanece depois de logout, expiração ou troca de conta em outra aba (o cache de consultas já é esvaziado/redefinido pelo `keytography-017`; as telas montadas recarregam).
+- **Clipboard:** a limpeza programada só apaga se o conteúdo ainda for o que a interface copiou; é disparada também no logout/expiração.
+- **Mutações não duplicam:** criar, restaurar e excluir não são reenviados por duplo clique (controle desabilitado durante o envio); a repetição automática do cliente só ocorre depois de um 401 (chamada não processada).
+- **Exclusão definitiva só com a confirmação digitada**, e a UI não oferece o atalho de repetição.
+
+Modos de falha a tratar explicitamente:
+
+- **401 persistente depois do refresh** (cofre sem DEK após reinício da API): a sessão termina e o formulário em edição se perde; mostrar o aviso de sessão expirada e não tentar guardar rascunho com segredos.
+- **Chamada recusada por troca de conta** (`017`): o formulário não pode exibir sucesso nem reenviar; mostra o aviso de conta trocada.
+- **Rede/5xx durante criar ou editar:** o usuário vê o erro e o formulário mantém os dados digitados (só em memória) para tentar de novo.
+- **Edição simultânea em duas abas:** sem controle de versão no backend, vale a última gravação.
+- **Lista grande, vazia ou lenta:** skeleton, estado vazio e erro distintos (nunca tela em branco).
+
+## Known Limitations
+
+- Sem controle de concorrência otimista: a última gravação vence (o backend não versiona entradas).
+- O conteúdo copiado fica no clipboard do sistema pelo intervalo configurado e pode ser lido por outros aplicativos nesse tempo.
+- Rascunho de formulário não sobrevive ao fim da sessão (decisão deliberada: não persistir segredos).
+
+## Verification Matrix
+
+| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+| --- | --- | --- |
+| Nada de segredo em storage/URL | teste de fluxo: criar/editar/copiar e inspecionar `localStorage`, `sessionStorage` e URL | mutação: gravar o rascunho em `sessionStorage` |
+| Fim de sessão/troca de conta limpa a tela | teste com tela montada + `signOut`/troca de conta | mutação: remover o reset de consultas |
+| Clipboard só limpa o que copiou | teste com relógio falso e clipboard alterado no meio | mutação: limpar sempre |
+| Mutação não duplica | teste de duplo clique com API lenta | mutação: não desabilitar o controle |
+| Exclusão definitiva exige confirmação | teste do diálogo | mutação: aceitar texto vazio |
+
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar as telas de cofre implementadas.

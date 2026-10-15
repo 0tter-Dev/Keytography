@@ -20,6 +20,8 @@ internal sealed partial class GovernanceChecker(string root)
     public const string LinkRule = "link";
     public const string ReadmeRule = "readme-raiz";
     public const string TemplateRule = "template";
+    public const string InvariantsRule = "invariantes";
+    public const string AdrIndexRule = "adr-indice";
 
     private static readonly string[] PlanFolders = ["backlog", "active", "review", "completed"];
 
@@ -36,6 +38,14 @@ internal sealed partial class GovernanceChecker(string root)
         "Documentation Updates", "Outcome",
     ];
 
+    /// <summary>Seções exigidas de todo plano ainda não concluído (planos concluídos antes da regra ficam isentos).</summary>
+    private static readonly string[] OpenPlanSections =
+    [
+        "Invariants And Failure Modes", "Known Limitations", "Verification Matrix",
+    ];
+
+    private const string InvariantsSection = "Invariants And Failure Modes";
+
     private readonly Dictionary<string, HashSet<string>> _anchorCache = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<Violation> Check()
@@ -48,6 +58,7 @@ internal sealed partial class GovernanceChecker(string root)
         CheckLinks(violations);
         CheckRootReadmeCoverage(plans, violations);
         CheckTemplateResidue(violations);
+        CheckAdrIndex(violations);
 
         return violations;
     }
@@ -116,12 +127,44 @@ internal sealed partial class GovernanceChecker(string root)
                 violations.Add(new(plan.RelativePath, PlanRule, $"seção `## {section}` ausente. Acrescente-a ao corpo do plano."));
             }
 
+            CheckInvariants(plan, violations);
+
             foreach (var dependency in plan.DependsOn.Where(dependency => !knownIds.Contains(dependency)))
             {
                 violations.Add(new(plan.RelativePath, PlanRule, $"`depends_on` cita `{dependency}`, que não é o `id` de nenhum plano. Corrija o id ou crie o plano."));
             }
 
             CheckLifecycle(plan, violations);
+        }
+    }
+
+    // --- Regra 7: invariantes e modos de falha (planos ainda não concluídos) ----------------------------------
+
+    private static void CheckInvariants(PlanDocument plan, List<Violation> violations)
+    {
+        if (plan.Folder == "completed")
+        {
+            return;
+        }
+
+        foreach (var section in OpenPlanSections)
+        {
+            if (string.IsNullOrWhiteSpace(plan.Section(section)))
+            {
+                violations.Add(new(plan.RelativePath, InvariantsRule, $"seção `## {section}` ausente ou vazia. Preencha-a (ou escreva \"Não se aplica: <justificativa>\" quando o plano não tem invariantes nem modos de falha relevantes)."));
+            }
+        }
+
+        // Portão de design: um plano ativo/em revisão que declara invariantes precisa tê-las aprovadas.
+        var invariants = plan.Section(InvariantsSection);
+        if (plan.Folder is "active" or "review"
+            && !string.IsNullOrWhiteSpace(invariants)
+            && !invariants.TrimStart().StartsWith("Não se aplica", StringComparison.OrdinalIgnoreCase)
+            && plan.Section("Approval") is { } approval
+            && !string.IsNullOrWhiteSpace(approval)
+            && !approval.Contains(InvariantsSection, StringComparison.Ordinal))
+        {
+            violations.Add(new(plan.RelativePath, InvariantsRule, $"o `## Approval` não cita `{InvariantsSection}`. Registre que o usuário aprovou essa seção (portão de design) antes da implementação."));
         }
     }
 
@@ -228,6 +271,45 @@ internal sealed partial class GovernanceChecker(string root)
             else if (declared.Success && listed != declared.Groups[1].Value)
             {
                 violations.Add(new("docs/STATUS.md", DashboardRule, $"a capability `{slug}` aparece como `{listed}`, mas docs/capabilities/{slug}/README.md declara `{declared.Groups[1].Value}`. Alinhe os dois (a capability é a fonte)."));
+            }
+        }
+    }
+
+    // --- Regra 8: índice de ADRs ----------------------------------------------------------------------------
+
+    private void CheckAdrIndex(List<Violation> violations)
+    {
+        var directory = Path.Combine(root, "docs", "decisions");
+        if (!Directory.Exists(directory))
+        {
+            return;
+        }
+
+        var indexPath = Path.Combine(directory, "README.md");
+        var index = File.Exists(indexPath) ? MarkdownText.Normalize(File.ReadAllText(indexPath)) : string.Empty;
+        var lines = index.Split('\n');
+
+        foreach (var file in Directory.GetFiles(directory, "ADR-*.md").Order(StringComparer.Ordinal))
+        {
+            var name = Path.GetFileName(file);
+            var entry = lines.FirstOrDefault(line => line.Contains(name, StringComparison.Ordinal));
+            if (entry is null)
+            {
+                violations.Add(new("docs/decisions/README.md", AdrIndexRule, $"o ADR `{name}` não está no índice. Acrescente uma linha linkando para ./{name}."));
+                continue;
+            }
+
+            var head = string.Join('\n', MarkdownText.Normalize(File.ReadAllText(file)).Split('\n').Take(8));
+            var superseded = SupersededStatus().IsMatch(head);
+            var marked = entry.Contains("substituíd", StringComparison.OrdinalIgnoreCase)
+                || entry.Contains("superseded", StringComparison.OrdinalIgnoreCase);
+            if (superseded && !marked)
+            {
+                violations.Add(new("docs/decisions/README.md", AdrIndexRule, $"o ADR `{name}` está marcado como substituído, mas o índice não diz isso. Acrescente \"substituído pelo ADR-XXXX\" à linha dele."));
+            }
+            else if (!superseded && marked)
+            {
+                violations.Add(new("docs/decisions/README.md", AdrIndexRule, $"o índice marca `{name}` como substituído, mas o ADR não tem a linha \"Status: substituído\" no topo. Alinhe os dois."));
             }
         }
     }
@@ -363,4 +445,7 @@ internal sealed partial class GovernanceChecker(string root)
 
     [GeneratedRegex(@"\{\{[^}\n]*\}\}")]
     private static partial Regex TemplatePlaceholder();
+
+    [GeneratedRegex(@"^>\s*\*{0,2}\s*Status\s*:\s*\*{0,2}\s*(substituíd|superseded)", RegexOptions.IgnoreCase | RegexOptions.Multiline)]
+    private static partial Regex SupersededStatus();
 }

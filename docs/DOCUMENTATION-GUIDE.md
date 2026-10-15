@@ -42,7 +42,9 @@ Uma entrega só está pronta quando **toda** a documentação afetada reflete o 
 3. `docs/STATUS.md` e `docs/ROADMAP.md`;
 4. guias afetados (`docs/guides/`), incluindo `running-locally.md` quando mudar como rodar o projeto;
 5. `docs/reference/` — se a API mudou, o contrato versionado e os tipos gerados (ver [ADR-0004](./decisions/ADR-0004-versioned-openapi-contract.md));
-6. ADRs, quando a entrega envolver uma decisão durável.
+6. ADRs, quando a entrega envolver uma decisão durável — e o índice em `docs/decisions/README.md`, que marca os ADRs substituídos (verificado);
+7. afirmações absolutas ("nunca", "toda", "nenhuma") em qualquer documento: cada uma aponta o teste que a sustenta ou lista as exceções;
+8. as seções `Invariants And Failure Modes`, `Known Limitations` e `Verification Matrix` do plano, que devem refletir o que foi entregue (e `Implementation Clarifications`, se houver).
 
 ### Verificação automática de governança
 
@@ -55,6 +57,8 @@ Parte destas regras é verificada por código, na suíte de testes (`tests/Keyto
 | `dashboard` | todo plano aberto aparece no `ROADMAP.md`, todo plano concluído aparece no `STATUS.md`, e toda capability está no Capability Dashboard com o mesmo status do seu `Current Status` | `STATUS.md` e `ROADMAP.md` como índices fiéis |
 | `link` | todo link relativo de `README.md`, `AGENTS.md` e `docs/**/*.md` aponta para um arquivo existente e, com `#âncora`, para um título existente (âncoras no estilo do GitHub) | "mantenha os links internos válidos" |
 | `readme-raiz` | todo plano `feat` ainda não concluído cita o `README.md` da raiz em `Documentation Updates` (atualização ou constatação deliberada de que não muda); planos concluídos antes da regra ficam isentos | a definição de "pronto" acima, item 2 |
+| `invariantes` | todo plano não concluído tem `Invariants And Failure Modes`, `Known Limitations` e `Verification Matrix` preenchidas (ou `Não se aplica: <justificativa>`), e o `Approval` de um plano `active`/`review` que declara invariantes as cita (portão de design) | o [Design Gate](./plans/README.md#design-gate) |
+| `adr-indice` | todo ADR está no índice de `docs/decisions/README.md`, e um ADR marcado como substituído no topo aparece assim no índice (e vice-versa) | índice de decisões fiel |
 | `template` | nenhum placeholder `{{...}}` esquecido (código inline e blocos de código são ignorados) | documentos finais sem resíduo de template |
 
 A mesma suíte tem a verificação de nomes de branches e PRs (`BranchNamingTests`): no CI de pull request, a branch deve seguir `<type>/<slug>` e o título do PR deve casar com ela, conforme a seção "Nomes de branches, PRs e planos" do [DEVELOPMENT-GUIDE.md](./DEVELOPMENT-GUIDE.md#nomes-de-branches-prs-e-planos). Branches de `dependabot/` e `renovate/` são isentas.
