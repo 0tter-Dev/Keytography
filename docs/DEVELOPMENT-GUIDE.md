@@ -33,6 +33,17 @@ Mudanças exigem revisão explícita quando:
 - `dotnet test` também valida a governança documental (planos, dashboards, links internos, README raiz nos planos) e, no CI de pull request, os nomes de branch e de PR. Regras e como tratar uma exceção: [DOCUMENTATION-GUIDE.md](./DOCUMENTATION-GUIDE.md#verificação-automática-de-governança).
 - **Revise o `README.md` da raiz** (Quick Start, Current Scope, Stack) em toda entrega que mude o que o projeto roda, oferece ou usa, e registre o resultado em `Documentation Updates` do plano. A lista completa do que revisar ao fechar uma entrega está em [DOCUMENTATION-GUIDE.md](./DOCUMENTATION-GUIDE.md#definição-de-pronto-para-a-documentação-de-uma-entrega).
 
+## Rotina de entrega e de correção
+
+Regras de método que valem para toda entrega (o porquê está na seção "Audit Rounds" de [plans/README.md](./plans/README.md#audit-rounds)):
+
+- **Antes de codar,** releia `Invariants And Failure Modes` do plano e proponha ao usuário as que faltam; nada é acrescentado em silêncio.
+- **Decisão durável durante a implementação vira ADR na mesma entrega**, com aprovação, sempre que ela cruza capabilities, cria política, aceita uma limitação, troca segurança por conveniência ou muda um contrato de comportamento.
+- **Ao corrigir qualquer achado,** varra os casos irmãos (o mesmo tipo de falha em outros pontos: outras chamadas, outros caminhos, outros documentos), escreva um teste que falha sem a correção e ajuste toda a documentação que afirma o comportamento.
+- **Prove as invariantes:** cada uma tem um teste cuja falha foi observada removendo o comportamento (mutação ou caso negativo), registrado na `Verification Matrix`.
+- **Pré-voo antes do PR:** rode o checklist da `project-audit` sobre a própria branch, e confira que os números e afirmações da descrição do PR batem com o que está na branch.
+- **Afirmações absolutas** ("nunca", "toda", "nenhuma") em documentação apontam o teste que as sustenta ou listam as exceções.
+
 ## Git Direction
 
 - Use Conventional Commits.

@@ -239,6 +239,103 @@ public class DocumentationGovernanceTests
         Assert.Empty(repository.Check());
     }
 
+    // --- Regra 7: invariantes e modos de falha --------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Invariants And Failure Modes")]
+    [InlineData("Known Limitations")]
+    [InlineData("Verification Matrix")]
+    public void Open_plan_must_have_the_invariants_sections(string section)
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write("docs/plans/backlog/demo-002-next-thing.md", SyntheticRepository.PlanText("demo-002", "backlog", dependsOn: "[demo-001]", without: section));
+
+        AssertSingle(repository, GovernanceChecker.InvariantsRule, "demo-002-next-thing.md", "## " + section);
+    }
+
+    [Fact]
+    public void Open_plan_with_an_empty_invariants_section_is_reported()
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write("docs/plans/backlog/demo-002-next-thing.md", SyntheticRepository.PlanText("demo-002", "backlog", dependsOn: "[demo-001]", invariants: string.Empty));
+
+        AssertSingle(repository, GovernanceChecker.InvariantsRule, "demo-002-next-thing.md", "Invariants And Failure Modes");
+    }
+
+    [Fact]
+    public void Completed_plans_are_exempt_from_the_invariants_sections()
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write(
+            "docs/plans/completed/demo-001-first-thing.md",
+            SyntheticRepository.PlanText("demo-001", "completed", actual: "minor", outcome: "Entregue.", without: "Verification Matrix"));
+
+        Assert.Empty(repository.Check());
+    }
+
+    [Theory]
+    [InlineData("active")]
+    [InlineData("review")]
+    public void Active_plan_with_invariants_must_cite_them_in_the_approval(string folder)
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write(
+            $"docs/plans/{folder}/demo-003-wip.md",
+            SyntheticRepository.PlanText("demo-003", folder, approval: "Aprovado pelo usuário.", invariants: "- a conta nunca vaza."));
+        repository.Replace("docs/ROADMAP.md", "| high |", "| high | [wip](./plans/" + folder + "/demo-003-wip.md) |\n| high |");
+
+        AssertSingle(repository, GovernanceChecker.InvariantsRule, "demo-003-wip.md", "Approval");
+    }
+
+    [Fact]
+    public void Approval_that_cites_the_invariants_passes_and_not_applicable_is_exempt()
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write(
+            "docs/plans/active/demo-003-wip.md",
+            SyntheticRepository.PlanText("demo-003", "active", approval: "Aprovado, incluindo `Invariants And Failure Modes`.", invariants: "- a conta nunca vaza."));
+        repository.Write(
+            "docs/plans/review/demo-004-other.md",
+            SyntheticRepository.PlanText("demo-004", "review", approval: "Aprovado.", invariants: "Não se aplica: só texto."));
+        repository.Replace(
+            "docs/ROADMAP.md",
+            "| high |",
+            "| high | [wip](./plans/active/demo-003-wip.md) [other](./plans/review/demo-004-other.md) |\n| high |");
+
+        Assert.Empty(repository.Check());
+    }
+
+    // --- Regra 8: índice de ADRs ----------------------------------------------------------------------------
+
+    [Fact]
+    public void Adr_must_be_listed_in_the_decisions_index()
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write("docs/decisions/README.md", "# ADRs\n\n");
+        repository.Write("docs/decisions/ADR-0001-algo.md", "# ADR-0001: Algo\n\n## Context\n");
+
+        AssertSingle(repository, GovernanceChecker.AdrIndexRule, "docs/decisions/README.md", "ADR-0001-algo.md");
+    }
+
+    [Fact]
+    public void Superseded_adr_must_be_marked_in_the_index_and_only_then()
+    {
+        using var repository = new SyntheticRepository();
+        repository.Write("docs/decisions/ADR-0001-algo.md", "# ADR-0001: Algo\n\n> **Status: substituído pelo ADR-0002.**\n");
+        repository.Write("docs/decisions/ADR-0002-novo.md", "# ADR-0002: Novo\n");
+        repository.Write(
+            "docs/decisions/README.md",
+            "# ADRs\n\n- [ADR-0001](./ADR-0001-algo.md)\n- [ADR-0002](./ADR-0002-novo.md)\n");
+
+        AssertSingle(repository, GovernanceChecker.AdrIndexRule, "docs/decisions/README.md", "marcado como substituído");
+
+        repository.Write(
+            "docs/decisions/README.md",
+            "# ADRs\n\n- [ADR-0001](./ADR-0001-algo.md) — substituído pelo ADR-0002\n- [ADR-0002](./ADR-0002-novo.md) — substituído\n");
+
+        AssertSingle(repository, GovernanceChecker.AdrIndexRule, "docs/decisions/README.md", "ADR-0002-novo.md");
+    }
+
     // --- Regra 6: resíduos de template ----------------------------------------------------------------------
 
     [Fact]

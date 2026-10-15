@@ -49,6 +49,28 @@ Exibir, nos formulários de entrada de cofre, a nota de força e o detalhamento 
 - Verificação manual criando entradas com senhas fracas e fortes contra a API local.
 - CI permanece verde.
 
+## Invariants And Failure Modes
+
+*Rascunho: confirmar/ajustar na aprovação do plano.*
+
+- **A API é a fonte da verdade:** o indicador nunca mostra "forte" quando a avaliação falhou ou ainda não chegou; erro/indisponível é um estado próprio.
+- **Respostas fora de ordem:** digitando rápido, uma resposta antiga não pode sobrescrever a mais recente (a nota exibida é sempre a da última senha digitada).
+- **A senha digitada não vai para URL, logs nem storage** (corpo de requisição apenas).
+- **Falha da avaliação não bloqueia o formulário:** com a API fora do ar o usuário ainda salva a entrada.
+- **Troca de conta/fim de sessão** descarta a avaliação em memória (cache limpo pelo `017`).
+
+## Known Limitations
+
+- Sem avaliação local de pré-visualização: com a API lenta o indicador atrasa (decisão: fonte única da verdade).
+
+## Verification Matrix
+
+| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+| --- | --- | --- |
+| Erro não aparece como "forte" | teste com API falhando | mutação: tratar erro como nota máxima |
+| Resposta fora de ordem não vence | teste com duas respostas invertidas | mutação: aplicar toda resposta ao chegar |
+| Formulário utilizável sem a avaliação | teste com API fora do ar | mutação: desabilitar o envio sem nota |
+
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar o indicador de força implementado.

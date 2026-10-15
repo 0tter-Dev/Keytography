@@ -71,6 +71,42 @@ A tela completa de configurações de conta (nome de exibição editável, uploa
 - Verificação manual completa: trocar senha, mudar densidade, mudar tema/cor, confirmar persistência após reload.
 - CI permanece verde.
 
+## Invariants And Failure Modes
+
+*Rascunho para o portão de design (plano sensível: autenticação e criptografia). **Requer revisão do `Scope` antes da ativação**: o plano foi escrito antes do `keytography-016`, e a DEK agora fica em cache **por sessão** (ADR-0006 item 6) e existe o `SecurityStamp` (item 11).*
+
+Invariantes (devem valer sempre):
+
+- **A senha atual é verificada antes de qualquer mudança**; senha incorreta não altera nada.
+- **Atomicidade:** nova cópia cifrada da DEK (chave derivada da nova senha), novo hash, registro em `UserPasswordHistory` e novo `SecurityStamp` entram na **mesma transação**; falha no meio não deixa o usuário sem acesso ao cofre.
+- **A DEK em si não muda** (sem decisão nova de criptografia, ADR-0001).
+- **Sessões:** o `SecurityStamp` novo invalida as **outras** sessões do usuário (e as DEKs delas saem do cache); a sessão corrente continua válida e com DEK. *A decidir na aprovação:* revogar as demais sessões (padrão proposto) ou não.
+- **Sem corrida com login/reset:** um login concorrente com a senha antiga (carimbo lido antes) não vira sessão válida (mesmo mecanismo do reset, ADR-0006 item 11); troca e reset concorrentes terminam em um estado único, sem mistura.
+- **Segredos nunca em log/URL/storage:** senha atual e nova só no corpo da requisição; campos limpos depois do envio.
+
+Modos de falha:
+
+- **Resposta perdida depois de a troca ser aplicada:** o usuário vê erro, mas a senha mudou; a UI orienta a tentar entrar com a nova senha e não repete a chamada automaticamente.
+- **Sessão sem DEK em cache (reinício do servidor):** 401, sem prosseguir.
+- **Tentativas de adivinhar a senha atual por uma sessão autenticada:** sem rate limiting no backend (ver limitações).
+- **Troca de conta em outra aba durante o formulário:** a chamada é recusada pelo cliente (`017`) e o formulário não reenvia.
+
+## Known Limitations
+
+- Sem limite de tentativas de senha atual incorreta (rate limiting fora de escopo, ADR-0006).
+- Preferências de interface em `localStorage` são por navegador, não por conta.
+
+## Verification Matrix
+
+| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+| --- | --- | --- |
+| Senha atual incorreta não altera nada | `dotnet test`: 401/422 e estado intacto | mutação: gravar antes de verificar |
+| Troca atômica | teste com falha injetada entre as gravações | mutação: gravar em transações separadas |
+| Outras sessões invalidadas, corrente mantida | teste de integração com duas sessões | mutação: não renovar o carimbo / invalidar a corrente |
+| Login concorrente com a senha antiga não cria sessão | teste de corrida (padrão do `016`) | mutação: ler o carimbo depois da senha |
+| Sem DEK em cache → 401 | `dotnet test` | mutação: prosseguir sem DEK |
+| Resposta perdida não reenvia | teste do cliente | mutação: repetir a chamada |
+
 ## Documentation Updates
 
 - `docs/capabilities/authentication-and-users/README.md`: documentar o novo endpoint `POST /auth/change-password` e seu uso da DEK em cache (sem novo ADR — reaproveita `ADR-0001`/`ADR-0002` sem decisão nova).

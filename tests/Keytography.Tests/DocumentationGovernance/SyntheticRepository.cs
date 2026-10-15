@@ -91,6 +91,7 @@ internal sealed class SyntheticRepository : IDisposable
         string approval = "",
         string outcome = "",
         string documentationUpdates = "- `README.md` (raiz): sem mudança.",
+        string invariants = "Não se aplica: plano de teste.",
         string? without = null)
     {
         var sections = new (string Name, string Content)[]
@@ -102,6 +103,9 @@ internal sealed class SyntheticRepository : IDisposable
             ("Approval", approval),
             ("Acceptance Criteria", "- funciona"),
             ("Validation", "- testes"),
+            ("Invariants And Failure Modes", invariants),
+            ("Known Limitations", "- nenhuma conhecida"),
+            ("Verification Matrix", "| criterio | teste |"),
             ("Documentation Updates", documentationUpdates),
             ("Outcome", outcome),
         };
