@@ -54,6 +54,8 @@ Aprovado pelo usuário em 2026-10-06, ao pedir explicitamente a ativação e a i
 
 Os esclarecimentos de implementação (ajustes de meio, não previstos no `Scope`) estão na seção seguinte; foram apresentados ao usuário nos relatórios da `project-audit` deste PR e **aceitos por ele em 2026-10-07** (esclarecimentos do primeiro relatório, mantidos numa seção própria em vez de dentro desta) **e em 2026-10-08**, quando o usuário **confirmou no chat, em resposta ao relatório da 4ª auditoria ("Confirmo")**, item a item: o `logout-all`, a política de conta por conferir (`unverified`) que impede chamadas com o token de outra conta, a época de sessão e a versão da conta carimbadas nas chamadas, o espaçamento com desistência das renovações em segundo plano, o teto de 5 leituras de identidade e os tempos limite de 20 s (refresh, `/auth/me`, logout). Todos tocam a autenticação do lado do cliente; os commits `06a0de9` e `6257412` os introduziram durante as rodadas de auditoria, e a confirmação acima é a que cobre esses itens.
 
+A seção `Invariants And Failure Modes` (com `Known Limitations` e `Verification Matrix`) foi consolidada em 2026-10-15 a partir das invariantes validadas nas rodadas de auditoria e já confirmadas pelo usuário item a item (ver `Implementation Clarifications`), para cumprir o [Design Gate](../README.md#design-gate) introduzido depois do início desta entrega.
+
 ## Implementation Clarifications
 
 Ajustes de meio, sem alterar o objetivo nem os critérios de aceite. Dois divergem do texto do `Scope` e prevalecem sobre ele: **(a)** só um `401` do refresh encerra a sessão (rede, `403` e `5xx` não); **(b)** após um `401` persistente o cliente também avisa a API (`logout`, em segundo plano).
