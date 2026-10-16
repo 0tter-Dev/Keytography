@@ -60,7 +60,7 @@ Desde `keytography-016`, o login cria uma sessão no banco: o access token (JWT)
 | `Sessions:MaxSessionsPerAdmin` | 10 | teto de sessões simultâneas de um `Admin`, de 1 a 100 |
 | `Sessions:ForceSecureCookie` | `false` | marca o cookie de refresh como `Secure` mesmo em requisições HTTP (proxy que termina TLS) |
 
-Valores fora do intervalo aceito (todos de no mínimo 1, com tetos de 1 dia para o access token, 30 dias de inatividade, 365 dias absolutos e 5 minutos de tolerância) fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. O CORS da API permite credenciais apenas para as origens listadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`), e `refresh`/`logout` recusam (403) um `Origin` presente que não esteja nessa lista; quem decide se o cookie é enviado é o navegador (`SameSite=Strict`, host e `Path=/auth`); com `curl`, use um cookie jar (`-c` e `-b`). Até o `keytography-017`, a interface web ainda não renova o token e volta ao login quando o access token vence.
+Valores fora do intervalo aceito (todos de no mínimo 1, com tetos de 1 dia para o access token, 30 dias de inatividade, 365 dias absolutos e 5 minutos de tolerância) fazem a API falhar ao iniciar. Para testar a renovação sem esperar, use `Sessions__AccessTokenMinutes=1`. O CORS da API permite credenciais apenas para as origens listadas em `Cors:AllowedOrigins` (por padrão, o servidor do Vite em `localhost:5173`), e `refresh`/`logout` recusam (403) um `Origin` presente que não esteja nessa lista; quem decide se o cookie é enviado é o navegador (`SameSite=Strict`, host e `Path=/auth`); com `curl`, use um cookie jar (`-c` e `-b`).
 
 ### Verificando as sessões com curl
 
@@ -165,7 +165,29 @@ A interface web (`keytography-007` em diante) é um projeto separado em `web/` (
 3. Cole o token na tela **Verificar e-mail** (aberta após o cadastro) e, em seguida, entre com o login e a senha.
 4. Para redefinir a senha, use **Esqueci minha senha**; o token de redefinição também aparece no log da API (vale 1 hora) e vai na tela **Redefinir senha**.
 
-A sessão da interface fica no `sessionStorage` do navegador (some ao fechar a aba). Desde `keytography-016` o access token dura 15 minutos e a interface ainda não o renova (até `keytography-017`): passado esse tempo, ela volta ao login.
+A interface guarda só o access token (15 minutos), **em memória**; a sessão vive na API e o refresh token em um cookie `HttpOnly`. Recarregar a página (F5) ou abrir outra aba restaura a sessão sozinho, o token é renovado em segundo plano e "Sair" encerra a sessão no servidor. Por causa do cookie, a origem da interface precisa estar em `Cors:AllowedOrigins` (padrão: `http://localhost:5173`). Para ver a renovação sem esperar, suba a API com `Sessions__AccessTokenMinutes=1` (a interface renova ~30 s antes do vencimento).
+
+### Verificando a sessão na interface web
+
+Roteiro repetível (o usado na verificação manual do `keytography-017`), com um banco descartável e o access token curto para ver a renovação rápido:
+
+1. Suba a API como em [Verificando as sessões com curl](#verificando-as-sessões-com-curl) (`Sessions__AccessTokenMinutes=1`, banco descartável) e a interface (`npm run dev`); crie e verifique um usuário de teste (acima).
+2. Entre pela interface. No painel de desenvolvedor do navegador, **Application → Local/Session storage** deve estar vazio, e `document.cookie` não mostra o cookie de refresh (`HttpOnly`).
+3. Recarregue a página (F5): continua logado, e a aba **Network** mostra `POST /auth/refresh` no carregamento, seguido de `GET /auth/me`.
+4. Espere cerca de 30 s com a aba aberta: aparecem `POST /auth/refresh` e `GET /auth/me` sem a tela mudar, repetidos a cada ~30 s.
+5. Clique em **Sair**: `POST /auth/logout` responde 204 e a interface vai ao login; F5 depois disso recebe 401 em `/auth/refresh` e fica no login, sem aviso de expiração.
+6. Complemento (não é o logout da interface do passo 5, que usa o seu próprio cookie): o access token **antigo** deixa de valer depois do logout. A interface não expõe o token, então prove o comportamento do servidor com uma sessão de curl:
+
+   ```bash
+   B=http://localhost:5247; H='content-type: application/json'
+   TOKEN=$(curl -s -c /tmp/kt-jar.txt -X POST $B/auth/login -H "$H" -d '{"login":"manual","password":"Senha-Manual-1"}' | sed -E 's/.*"token":"([^"]+)".*/\1/')
+   code() { curl -s -o /dev/null -w "%{http_code}\n" "$@"; }
+   code $B/auth/me -H "Authorization: Bearer $TOKEN"                    # esperado: 200
+   code -b /tmp/kt-jar.txt -X POST $B/auth/logout                       # esperado: 204
+   code $B/auth/me -H "Authorization: Bearer $TOKEN"                    # esperado: 401
+   ```
+
+7. Troca de conta: entre como o usuário A na aba 1, e como outro usuário B na aba 2 do mesmo navegador; ao renovar (ou numa nova chamada), a aba 1 avisa e passa a mostrar B.
 
 **Scripts úteis (em `web/`):**
 

@@ -31,7 +31,8 @@ async function run<T>(
 
 export function login(body: { login: string; password: string }) {
   return run(
-    () => api.POST('/auth/login', { body }),
+    // `credentials: 'include'`: sem ele o navegador ignora o Set-Cookie do refresh (origens diferentes).
+    () => api.POST('/auth/login', { body, credentials: 'include' }),
     (status) =>
       status === 401 ? 'invalidCredentials' : status === 403 ? 'emailNotVerified' : 'unknown',
   )

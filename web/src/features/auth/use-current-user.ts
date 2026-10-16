@@ -1,25 +1,51 @@
-import { useQuery } from '@tanstack/react-query'
-import { api } from '@/api/client'
-import type { components } from '@/api/schema'
-import { isSessionActive, useSessionStore } from './session-store'
+import { useEffect, useRef, useState } from 'react'
+import { loadIdentity } from './session'
+import { useSessionStore } from './session-store'
 
-export type CurrentUser = components['schemas']['MeResponse']
+/** Espera antes de pedir a identidade de novo quando `GET /auth/me` falhou. */
+const RETRY_IDENTITY_MS = 15_000
 
-/** Usuário da sessão atual (`GET /auth/me`). Um 401 encerra a sessão via middleware do cliente. */
+/** Teto de tentativas de ler a identidade (a primeira incluída) enquanto a leitura falha. */
+export const MAX_IDENTITY_ATTEMPTS = 5
+
+/**
+ * Usuário da sessão atual (`GET /auth/me`, carregado sob demanda e conferido a cada renovação da
+ * sessão). Fica no store da sessão, e não no cache de consultas, para que a verificação de troca
+ * de conta compare a conta que esta aba mostra com a que o cookie compartilhado agora representa.
+ */
 export function useCurrentUser() {
-  const token = useSessionStore((state) => state.token)
-  const expiresAt = useSessionStore((state) => state.expiresAt)
+  const user = useSessionStore((state) => state.user)
+  const hasToken = useSessionStore((state) => state.token !== null)
+  const [attempt, setAttempt] = useState(0)
+  const failures = useRef(0)
 
-  return useQuery({
-    // O token na chave isola o cache por sessão: outro login nunca enxerga o usuário anterior.
-    queryKey: ['me', token],
-    enabled: isSessionActive({ token, expiresAt }),
-    queryFn: async () => {
-      const { data, response } = await api.GET('/auth/me')
-      if (!data) {
-        throw new Error(`GET /auth/me falhou (${response.status})`)
+  // Sem a identidade o aviso de troca de conta não funciona (não há "conta anterior" a comparar):
+  // se a leitura falhou, tenta de novo em instantes, até o teto. Depois disso, a próxima renovação
+  // da sessão lê a identidade de novo (`renewSession`).
+  useEffect(() => {
+    if (!hasToken || user !== null) {
+      failures.current = 0
+      return
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let cancelled = false
+    void loadIdentity().then((loaded) => {
+      if (cancelled) {
+        return // efeito descartado (ex.: StrictMode monta duas vezes): a tentativa não conta
       }
-      return data
-    },
-  })
+      if (loaded) {
+        return // `user` passa a existir e o efeito zera o contador
+      }
+      failures.current += 1
+      if (failures.current < MAX_IDENTITY_ATTEMPTS) {
+        timer = setTimeout(() => setAttempt((count) => count + 1), RETRY_IDENTITY_MS)
+      }
+    })
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [hasToken, user, attempt])
+
+  return { data: user }
 }
