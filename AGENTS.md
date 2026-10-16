@@ -24,7 +24,7 @@ Mudanças em endpoint, DTO ou metadado de resposta da API exigem regenerar e com
 
 Agentes podem alterar detalhes de implementação dentro da arquitetura documentada, testes, e clareza de documentação. Aprovação explícita é exigida para mudanças em arquitetura, contratos públicos, dependências estratégicas, ou no escopo/non-goals descritos em `PROJECT-ARCHITECTURE.md`.
 
-Dado o caráter sensível dos dados que o Keytography armazena (credenciais de contas de terceiros), qualquer mudança que toque criptografia, armazenamento de senhas, autenticação, ou controle de acesso entre roles (`Admin` / `Member`) sempre exige aprovação humana explícita, mesmo quando estaria tecnicamente dentro do escopo documentado de um plano ativo.
+Dado o caráter sensível dos dados que o Keytography armazena (credenciais de contas de terceiros), qualquer mudança que toque criptografia, armazenamento de senhas, autenticação, ou controle de acesso entre roles (`Admin` / `Member`) sempre exige aprovação humana explícita, mesmo quando estaria tecnicamente dentro do escopo documentado de um plano ativo. Planos que tocam essas áreas (ou estado compartilhado, concorrência e rede de forma central) passam pelo [Design Gate](docs/plans/README.md#design-gate): a seção `Invariants And Failure Modes` é aprovada antes da ativação.
 
 ## Git e entrega
 

@@ -51,6 +51,30 @@ Integrar o gerador de senha (`keytography-006`) aos formulários de entrada de c
 - Verificação manual gerando senhas com parâmetros variados contra a API local, incluindo o caso de força mínima inatingível.
 - CI permanece verde.
 
+## Invariants And Failure Modes
+
+*Rascunho: confirmar/ajustar na aprovação do plano.*
+
+- **A senha gerada só existe na memória do modal e do campo do formulário:** nunca em URL, log ou storage; ao fechar o modal sem aplicar, o valor é descartado.
+- **Cancelar não altera o campo de senha** do formulário.
+- **Respostas fora de ordem** (gerar de novo rapidamente): vale a última solicitação.
+- **422 (força mínima inatingível)** tem mensagem própria; qualquer outro erro mostra mensagem genérica sem perder os parâmetros escolhidos.
+- **Gerar de novo produz valor diferente** (aleatoriedade vem do backend; a UI não reaproveita resposta em cache).
+- **Fim de sessão/troca de conta** durante o modal fecha o modal e descarta o valor.
+
+## Known Limitations
+
+- A senha gerada trafega pela API (TLS na implantação real; HTTP local em desenvolvimento).
+
+## Verification Matrix
+
+| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+| --- | --- | --- |
+| Cancelar não altera o campo | teste do modal | mutação: aplicar ao abrir |
+| 422 tem mensagem própria | teste com API 422 | mutação: tratar como erro genérico |
+| Gerar de novo muda a senha e não usa cache | teste com duas chamadas | mutação: cache da primeira resposta |
+| Fim de sessão descarta o valor | teste com `signOut` com modal aberto | mutação: manter o estado |
+
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar a ferramenta de geração integrada.

@@ -24,9 +24,21 @@ documentation_updates: []
 
 Todo corpo de plano deve conter `Objective`, `Context`, `Scope`, `Out Of Scope`, `Acceptance Criteria`, `Validation`, `Documentation Updates`, e `Outcome`. Um plano ativo também deve registrar a aprovação explícita do usuário.
 
+Planos ainda não concluídos (`backlog`, `active`, `review`) também devem conter as seções abaixo (verificado em `dotnet test`; planos concluídos antes desta regra ficam isentos):
+
+- **`Invariants And Failure Modes`:** o que deve valer **sempre** (consistência, segurança, nenhum vazamento entre contas ou sessões, idempotência) e os modos de falha a tratar: concorrência e corridas, rede lenta ou fora do ar, resposta perdida, reinício do servidor, relógio, falha parcial, resposta antiga chegando tarde, entrada hostil. Um plano que realmente não tem nenhum escreve `Não se aplica: <justificativa>`.
+- **`Known Limitations`:** limitações aceitas, cada uma com a aprovação registrada (ou "nenhuma conhecida até aqui").
+- **`Verification Matrix`:** para cada invariante e critério de aceite, o teste que o cobre e como se prova que o teste falha quando o comportamento é removido (mutação ou caso negativo).
+
+Decisões e ajustes de meio tomados durante a implementação entram em uma seção `Implementation Clarifications` (opcional), cada um com data e com a forma como foi aprovado; o `Approval` original não é reescrito. Veja também [Design Gate](#design-gate) e [Audit Rounds](#audit-rounds).
+
 `Documentation Updates` deve cobrir **toda** a documentação afetada (checklist em [DOCUMENTATION-GUIDE.md](../DOCUMENTATION-GUIDE.md#definição-de-pronto-para-a-documentação-de-uma-entrega)): cada capability autorizada cujo comportamento muda, o `README.md` da raiz (Quick Start, Current Scope, Stack) quando a entrega muda o que o projeto roda/oferece/usa, `STATUS.md`/`ROADMAP.md`, guias, e — se a API muda — o contrato em `docs/reference/`. Cada item é atualizado ou registrado como "não precisa mudar", de forma deliberada. O `Acceptance Criteria` de um plano que muda o que o projeto oferece deve incluir que o `README.md` da raiz reflete o estado real.
 
 O front matter completo, a concordância entre pasta e `status`, as seções obrigatórias, o `Outcome` dos planos concluídos, o `Approval` dos planos ativos e em revisão e a menção ao `README.md` da raiz nos planos `feat` ainda não concluídos são verificados automaticamente em `dotnet test` e no CI (ver [DOCUMENTATION-GUIDE.md](../DOCUMENTATION-GUIDE.md#verificação-automática-de-governança)).
+
+## Design Gate
+
+Um plano que toca o que o [AGENTS.md](../../AGENTS.md) classifica como sensível (criptografia, armazenamento de senhas, autenticação, controle de acesso entre roles) — ou que trata estado compartilhado, concorrência ou rede de forma central — tem a seção `Invariants And Failure Modes` **revisada e aprovada pelo usuário antes da ativação**: o `Approval` precisa citá-la (a governança verifica). A revisão é onde invariantes e modos de falha faltantes são descobertos, antes de virarem código e rodadas de auditoria. Os demais planos aprovam a seção junto com o plano. Mudanças nessas seções depois da aprovação passam pelo usuário e entram em `Implementation Clarifications`.
 
 ## Ordering And Eligibility
 
@@ -45,6 +57,14 @@ A `project-audit` roda como portão antes do merge de entregas relevantes. A dec
 **Modo de execução da project-audit:** subagente
 
 Valores aceitos: `perguntar` (a skill pergunta a cada auditoria), `subagente` (sempre em um subagente de contexto limpo, sem o histórico da implementação) ou `sessão atual` (na própria conversa). O padrão anterior era `perguntar`; em 2026-10-03 o usuário fixou `subagente` (revisão independente, em contexto limpo). Para mudar a decisão, troque o valor acima em um PR revisado. A auditoria em subagente é a recomendada para entregas complexas ou críticas (revisão independente do próprio autor); em qualquer modo ela só reporta, nunca corrige.
+
+### Audit Rounds
+
+1. **Pré-voo:** antes de abrir o PR, quem implementa roda o checklist da `project-audit` sobre a própria branch (status do plano × pasta, links, capability, README raiz, ADR e índice, contratos gerados, números da descrição do PR) e confere a `Verification Matrix`.
+2. **1ª rodada:** além do checklist, percorre as categorias de falha (concorrência e corridas, tempo e limites, falha parcial e resposta perdida, reinício, idempotência, vazamento entre contas e sessões).
+3. **Correção em lote:** os achados de uma rodada são corrigidos juntos, cada um com a **varredura dos casos irmãos** (a mesma falha em outros pontos), um teste que falha sem a correção e a documentação ajustada no mesmo commit.
+4. **Rodadas seguintes:** cobrem o que mudou desde a anterior, regressões e a verificação das varreduras. A 3ª rodada em diante só acontece se a anterior achou crítico ou importante **em código novo**; menores e sugestões vão para o `Outcome` ou para o backlog, por padrão.
+5. **Relatório:** cada achado traz a categoria da causa-raiz e se foi introduzido por uma correção anterior; o usuário decide o que bloqueia o merge.
 
 ## Parallel Execution
 

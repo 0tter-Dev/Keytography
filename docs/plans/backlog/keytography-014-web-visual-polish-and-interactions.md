@@ -57,6 +57,29 @@ Cada plano anterior já entrega estilo básico (nada fica sem estilo por padrão
 - Verificação manual de navegação por teclado em pelo menos um fluxo completo (criar entrada de cofre).
 - CI permanece verde.
 
+## Invariants And Failure Modes
+
+*Rascunho: confirmar/ajustar na aprovação do plano.*
+
+- **Nenhum segredo nas novas superfícies:** a command palette indexa só título/login (nunca senha), não persiste busca em storage, e toasts/atalhos nunca carregam segredos.
+- **Atalhos não disparam em campos de texto** nem em diálogos de confirmação destrutiva.
+- **Movimento respeita `prefers-reduced-motion`**; nenhuma animação bloqueia a interação.
+- **Contraste e foco preservados** em todas as combinações tema × cor (a guarda `contrast.test` continua passando).
+- **Telas montadas não mostram dado de outra conta** depois da troca (a polidez não pode reintroduzir cache próprio).
+
+## Known Limitations
+
+- A validação de contraste e de responsividade é amostral, não exaustiva.
+
+## Verification Matrix
+
+| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+| --- | --- | --- |
+| Palette não indexa senha | teste da palette com entradas que têm senha | mutação: incluir a senha no índice |
+| Atalhos ignoram campos de texto | teste de teclado em `input` | mutação: remover a checagem do alvo |
+| Movimento reduzido | teste com `matchMedia` reduzido | mutação: ignorar a preferência |
+| Contraste | `contrast.test.ts` existente | mutação já usada na guarda |
+
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: `Current Status` para `implemented` — a interface web está funcionalmente completa para esta fase.
