@@ -1,4 +1,4 @@
-import { api } from '@/api/client'
+import { api, isRefusedLocally } from '@/api/client'
 import { useSessionStore, type CurrentUser } from './session-store'
 
 /**
@@ -253,7 +253,9 @@ async function endSessionVia(
   useSessionStore.setState((state) => ({ epoch: state.epoch + 1 }))
   try {
     const { response } = await withTimeout(call)
-    if (!response.ok && response.status !== 401) {
+    // 401 do servidor: a sessão já não existe lá (ex.: encerrada em outra aba). Já uma chamada
+    // recusada localmente (conta por conferir/trocada) NÃO chegou ao servidor: nada foi encerrado.
+    if (isRefusedLocally(response) || (!response.ok && response.status !== 401)) {
       result = 'unreachable'
     }
   } catch {
@@ -283,6 +285,8 @@ export function logoutAllSessions(): Promise<'server' | 'unreachable'> {
  * morta no próximo F5, e leva ao login como expirada.
  */
 export function endSessionAsExpired(): void {
-  void api.POST('/auth/logout', { credentials: 'include' }).catch(() => undefined)
+  void withTimeout((signal) => api.POST('/auth/logout', { credentials: 'include', signal })).catch(
+    () => undefined,
+  )
   useSessionStore.getState().expire()
 }

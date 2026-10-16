@@ -59,7 +59,19 @@ export const resetClientRuntime = () => originals.clear()
  * com o token de outra conta (ou sem saber de quem é), e enviar a chamada com ele levaria dados da
  * conta anterior para a nova. Equivale ao 401 que o servidor daria, e o chamador trata igual.
  */
-const refused = () => new Response(null, { status: 401 })
+const refusedResponses = new WeakSet<Response>()
+const refused = () => {
+  const response = new Response(null, { status: 401 })
+  refusedResponses.add(response)
+  return response
+}
+
+/**
+ * `true` se a resposta é a recusa local de uma chamada (conta trocada ou por conferir), e não um 401
+ * do servidor: quem interpreta o status precisa distinguir, porque "o servidor disse 401" e "a
+ * chamada nem saiu" têm significados diferentes (ex.: logout-all recusado NÃO encerrou nada).
+ */
+export const isRefusedLocally = (response: Response) => refusedResponses.has(response)
 
 /**
  * Sessão no cliente tipado (ADR-0006): anexa o access token (renovando-o antes se estiver para

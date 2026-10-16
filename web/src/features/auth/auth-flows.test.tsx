@@ -232,7 +232,7 @@ describe('restauração da sessão ao abrir a aplicação', () => {
     expect(screen.queryByText(auth.login.sessionExpired)).not.toBeInTheDocument()
   })
 
-  it('o access token não aparece em localStorage nem em sessionStorage em nenhum momento', async () => {
+  it('depois de restaurar a sessão, o access token não aparece em localStorage nem em sessionStorage', async () => {
     stubApi({
       ...HEALTH,
       'POST /auth/refresh': REFRESHED('token-que-nao-pode-vazar'),

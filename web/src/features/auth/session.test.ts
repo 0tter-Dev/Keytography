@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { REFRESHED, signInForTest, stubApi } from '@/test/api-stub'
 import {
+  MAX_SHORT_RENEWALS,
+  MIN_RENEW_DELAY_MS,
+  REFRESH_LEAD_MS,
+  RETRY_AFTER_UNREACHABLE_MS,
+  SESSION_REQUEST_TIMEOUT_MS,
   confirmAccount,
+  endSessionAsExpired,
   loadIdentity,
   logoutAllSessions,
   logoutSession,
@@ -407,4 +413,69 @@ describe('encerramento da sessão: tempo limite e tipos de resposta', () => {
       expect(useSessionStore.getState().token).toBeNull()
     },
   )
+})
+
+describe('logout-all recusado localmente não é "servidor avisado"', () => {
+  it('conta por conferir (/auth/me fora): a chamada não sai, o estado local é limpo e o resultado avisa', async () => {
+    signInForTest('t1', undefined, ana)
+    useSessionStore.setState({ unverified: true })
+    const { calls } = stubApi({
+      'POST /auth/logout-all': { status: 204 },
+      'GET /auth/me': { status: 503 },
+    })
+
+    expect(await logoutAllSessions()).toBe('unreachable')
+
+    expect(calls.some((call) => call.path === '/auth/logout-all')).toBe(false)
+    expect(useSessionStore.getState().token).toBeNull()
+  })
+
+  it('outra conta ativa no navegador: a chamada não sai e o resultado avisa', async () => {
+    signInForTest('t1', undefined, ana)
+    useSessionStore.setState({ unverified: true })
+    const { calls } = stubApi({
+      'POST /auth/logout-all': { status: 204 },
+      'GET /auth/me': { body: bia },
+    })
+
+    expect(await logoutAllSessions()).toBe('unreachable')
+    expect(calls.some((call) => call.path === '/auth/logout-all')).toBe(false)
+  })
+})
+
+describe('encerrar a sessão como expirada (401 persistente)', () => {
+  it('avisa a API com o cookie e com tempo limite de 20 s, sem esperar', async () => {
+    vi.useFakeTimers()
+    signInForTest('t1', undefined, ana)
+    let seen: Request | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: Request) => {
+        seen = request
+        return new Promise<Response>((_resolve, reject) => {
+          request.signal.addEventListener('abort', () => reject(new TypeError('aborted')))
+        })
+      }),
+    )
+
+    endSessionAsExpired()
+    expect(useSessionStore.getState()).toMatchObject({ token: null, expired: true })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(seen?.credentials).toBe('include')
+    expect(seen?.url.endsWith('/auth/logout')).toBe(true)
+    expect(seen?.signal.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(20_001)
+    expect(seen?.signal.aborted).toBe(true)
+  })
+})
+
+describe('parâmetros documentados do cliente de sessão', () => {
+  it('seguem os valores aprovados (30 s, 5 s, 5 renovações, 15 s, 20 s)', () => {
+    expect(REFRESH_LEAD_MS).toBe(30_000)
+    expect(MIN_RENEW_DELAY_MS).toBe(5_000)
+    expect(MAX_SHORT_RENEWALS).toBe(5)
+    expect(RETRY_AFTER_UNREACHABLE_MS).toBe(15_000)
+    expect(SESSION_REQUEST_TIMEOUT_MS).toBe(20_000)
+  })
 })

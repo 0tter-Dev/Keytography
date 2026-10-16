@@ -135,3 +135,9 @@ describe('useCurrentUser: teto de tentativas', () => {
     expect(calls.length - afterLoad).toBe(MAX_IDENTITY_ATTEMPTS) // 5 novas tentativas, não 1
   })
 })
+
+describe('useCurrentUser: parâmetros documentados', () => {
+  it('o teto é de 5 leituras', () => {
+    expect(MAX_IDENTITY_ATTEMPTS).toBe(5)
+  })
+})
