@@ -2,7 +2,8 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ptBR from '@/i18n/locales/pt-BR.json'
-import { renderRoutes, signInForTest, stubApi } from '@/test/render'
+import { signInForTest, stubApi } from '@/test/api-stub'
+import { renderRoutes } from '@/test/render'
 import { AppShell } from './AppShell'
 
 function renderShell() {

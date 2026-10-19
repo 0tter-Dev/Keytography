@@ -1,9 +1,11 @@
 import { LogOut } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { useSessionStore } from './session-store'
+import { logoutSession } from './session'
 import { useCurrentUser } from './use-current-user'
 
 type UserMenuProps = {
@@ -16,12 +18,17 @@ type UserMenuProps = {
 export function UserMenu({ collapsed = false, onNavigate }: UserMenuProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const signOut = useSessionStore((state) => state.signOut)
   const { data: user } = useCurrentUser()
+  const [leaving, setLeaving] = useState(false)
 
-  function logout() {
-    // O cache de consultas é limpo pelo `SessionController`, em qualquer fim de sessão.
-    signOut()
+  async function logout() {
+    setLeaving(true)
+    // Revoga a sessão na API e só então limpa o estado local (o cache de consultas é limpo pelo
+    // `SessionController`). Se a API não responder, o estado local é limpo mesmo assim.
+    const result = await logoutSession()
+    if (result === 'unreachable') {
+      toast.warning(t('auth.logoutUnreachable'))
+    }
     onNavigate?.()
     navigate('/login', { replace: true })
   }
@@ -36,7 +43,13 @@ export function UserMenu({ collapsed = false, onNavigate }: UserMenuProps) {
           {user.login}
         </span>
       )}
-      <Button variant="ghost" size="icon" aria-label={t('nav.logout')} onClick={logout}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={t('nav.logout')}
+        disabled={leaving}
+        onClick={logout}
+      >
         <LogOut />
       </Button>
     </div>

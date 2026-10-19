@@ -124,6 +124,10 @@
       "submit": "Redefinir senha",
       "submitting": "Redefinindo…",
       "success": "Senha redefinida. Entre com a nova senha."
-    }
+    },
+    "restoring": "Restaurando a sua sessão…",
+    "accountChanged": "Você entrou com outra conta em outra aba ou janela. Agora esta aba mostra a conta atual.",
+    "restoreUnreachable": "Não foi possível falar com o servidor para restaurar a sua sessão. Tente novamente em instantes.",
+    "logoutUnreachable": "Você saiu neste dispositivo, mas não foi possível avisar o servidor: a sessão dele pode continuar ativa até expirar."
   }
 }

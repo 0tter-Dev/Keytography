@@ -1,6 +1,6 @@
 # ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend
 
-> **Status:** a "direção desejada" foi implementada no lado do servidor pelo [ADR-0006](./ADR-0006-backend-managed-sessions.md) (`keytography-016`). O modelo de **cliente** descrito abaixo (JWT em `sessionStorage`, logout local) segue vigente só até o `keytography-017` adaptar a interface web; depois dele, este ADR fica substituído pelo ADR-0006.
+> **Status: substituído pelo [ADR-0006](./ADR-0006-backend-managed-sessions.md).** A "direção desejada" foi implementada no servidor pelo `keytography-016` e o cliente web foi adaptado pelo `keytography-017` (access token só em memória, restauração por refresh, logout real). O modelo de cliente descrito abaixo (JWT em `sessionStorage`, logout local) é histórico.
 
 ## Context
 
@@ -19,7 +19,7 @@ A interface web (`keytography-008`) precisou decidir onde o cliente guarda o tok
 
 **Direção desejada (implementada no servidor pelo ADR-0006; a adaptação do cliente web é o `keytography-017`):** sessões **gerenciadas e controladas pelo backend, persistidas no banco**, com validação do estado da sessão nos endpoints, refresh de token e logout/revogação reais (inclusive de todas as sessões do usuário). Isso resolve as limitações acima: "Sair" passaria a invalidar de fato a sessão e a remover a DEK do cache; o token de acesso poderia ser de vida curta com refresh controlado; e a política de onde o cliente guarda o token poderia ser revista (por exemplo, cookie `HttpOnly` para o refresh).
 
-Esta direção **não faz parte da entrega que originou este ADR**: está implementada no servidor pelo `keytography-016` ([ADR-0006](./ADR-0006-backend-managed-sessions.md)) e será adotada pela interface web no `keytography-017` (ainda em `backlog`, dependente de aprovação humana). Ela depende de um plano próprio com aprovação humana explícita, porque:
+Esta direção **não faz parte da entrega que originou este ADR**: está implementada no servidor pelo `keytography-016` ([ADR-0006](./ADR-0006-backend-managed-sessions.md)) e foi adotada pela interface web no `keytography-017`. Ela depende de um plano próprio com aprovação humana explícita, porque:
 
 - altera o contrato público da API (novos endpoints e respostas) e o esquema do banco (migration de sessões);
 - altera o fluxo de autenticação e o controle de sessão do backend, o que o `AGENTS.md` classifica como mudança que sempre exige revisão humana;

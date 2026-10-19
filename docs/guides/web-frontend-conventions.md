@@ -105,17 +105,19 @@ A preferência é persistida em `localStorage` (`keytography.appearance`); `inde
 
 ## Sessão e rotas protegidas
 
-> **Nota de transição (`keytography-016`):** a API passou a gerenciar as sessões (access token de 15 minutos, refresh por cookie `HttpOnly`, logout real; [ADR-0006](../decisions/ADR-0006-backend-managed-sessions.md)). As regras abaixo descrevem o cliente atual (JWT em `sessionStorage`, logout local) e serão reescritas pelo `keytography-017`; até lá, a interface volta ao login a cada 15 minutos.
+A sessão é gerenciada pela API ([ADR-0006](../decisions/ADR-0006-backend-managed-sessions.md)); o cliente só guarda o access token, **em memória**.
 
-- A sessão (JWT + `expiresAt`) vive em `features/auth/session-store.ts`, persistida em **`sessionStorage`** — não em `localStorage` — de propósito: é um cofre de senhas e o token deve sumir com a aba (decisão e direção futura no [ADR-0005](../decisions/ADR-0005-client-session-model-and-backend-managed-sessions.md)). Não guarde o token em outro lugar nem o copie para estado de componente.
-- Quem precisa estar logado fica sob a rota `RequireAuth` (`features/auth/guards.tsx`); telas só para visitantes ficam sob `GuestOnly`. Rotas novas entram em `app/routes.tsx`.
-- Chamadas à API usam sempre o cliente tipado: ele anexa o `Authorization` (menos nos endpoints anônimos, listados em `api/client.ts` — um endpoint anônimo novo entra nessa lista) e trata o 401 (encerra a sessão). Não monte o cabeçalho à mão.
-- Consultas que dependem do usuário incluem o token na `queryKey` (`['me', token]`) e o `SessionController` esvazia o cache do TanStack Query em qualquer fim de sessão (logout, expiração, 401, novo login), para nada de uma sessão vazar para a próxima. Depois do login, `loginRedirectTarget` (`features/auth/redirect.ts`) devolve o destino guardado pelo `RequireAuth`, só se for um caminho interno.
+- O access token (e o usuário carregado) vive em `features/auth/session-store.ts`, **sem persistência**: nunca vá para `localStorage`/`sessionStorage`, nem para estado de componente ou URL. O refresh token é um cookie `HttpOnly` que o script não enxerga.
+- O ciclo de vida (restauração por refresh ao abrir a aplicação, renovação com **uma única chamada em andamento por aba**, descarte da resposta de um refresh que chega depois do fim da sessão, verificação de troca de conta, logout real) fica em `features/auth/session.ts`; `SessionController` o aciona (restauração, renovação antes do vencimento, limpeza do cache). Não chame `/auth/refresh`, `/auth/logout` nem `/auth/logout-all` fora desse módulo (`logoutAllSessions()` é o "sair de todos os dispositivos").
+- Quem precisa estar logado fica sob a rota `RequireAuth` (`features/auth/guards.tsx`, que espera a restauração da sessão antes de decidir e, no vencimento do token, espera um refresh em andamento antes de encerrar a sessão); telas só para visitantes ficam sob `GuestOnly`. Rotas novas entram em `app/routes.tsx`.
+- Chamadas à API usam sempre o cliente tipado (`api/client.ts`): ele anexa o `Authorization`, renova o token se estiver para vencer e, ao receber 401, renova a sessão e **repete a chamada uma vez**; um 401 que persiste encerra a sessão (sem laço). Não monte o cabeçalho à mão, e não trate 401 nas telas. Endpoints anônimos (e o refresh) ficam na lista `PUBLIC_PATHS`; um endpoint anônimo novo entra nela. As chamadas que usam o cookie de refresh (`login`, `refresh`, `logout`) passam `credentials: 'include'` (web e API são origens diferentes).
+- O usuário da sessão vem de `useCurrentUser()` (carregado sob demanda do store, e conferido a cada renovação). Consultas ao TanStack Query **não** incluem o token na chave: o `SessionController` esvazia o cache quando a sessão termina ou a **conta muda**, e só então — renovar o token da mesma conta não limpa nada.
+- Depois do login, `loginRedirectTarget` (`features/auth/redirect.ts`) devolve o destino guardado pelo `RequireAuth`, só se for um caminho interno.
 
 ## Testes
 
 - Vitest + React Testing Library. Consultar elementos **por papel e nome acessível** (`getByRole('button', { name })`), usando os textos do `pt-BR.json` (não duplique strings no teste).
-- Mockar a rede com `vi.stubGlobal('fetch', ...)`; nunca depender de API rodando. Para fluxos com rotas e API, use os auxiliares de `src/test/render.tsx` (`renderRoutes`, `stubApi` por rota, `signInForTest`) e renderize a árvore real de `app/routes.tsx`.
+- Mockar a rede com `vi.stubGlobal('fetch', ...)`; nunca depender de API rodando. Para fluxos com rotas e API, use os auxiliares de `src/test/` — `renderRoutes` (`render.tsx`; por padrão a aba já restaurou a sessão, `{ restored: false }` testa a restauração), `stubApi` por rota, `signInForTest` e `REFRESHED` (`api-stub.ts`) — e renderize a árvore real de `app/routes.tsx`. O `setup.ts` reinicia o store da sessão, os avisos e o estado de módulo (chamadas em voo) a cada teste.
 - Comportamento visual que depende de CSS real (contraste, breakpoints, animações) não roda no jsdom — é verificado manualmente no navegador e registrado no PR.
 
 ## Acessibilidade mínima
