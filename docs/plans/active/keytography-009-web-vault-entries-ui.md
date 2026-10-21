@@ -1,6 +1,6 @@
 ---
 id: keytography-009
-status: backlog
+status: active
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -62,6 +62,8 @@ O tratamento de segredos no cliente web (cache, revelar, clipboard, formulários
 - Tags, favoritos, grupos/subgrupos — não existem no schema do backend; registrados como evolução futura em `docs/capabilities/vault-entries/README.md`.
 
 ## Approval
+
+Ativado e aprovado pelo usuário em 2026-10-21, ao pedir explicitamente a ativação e a implementação deste plano (o próximo da fila do `ROADMAP.md`), depois da revisão do Design Gate registrada no PR #33. **A seção `Invariants And Failure Modes` (com `Known Limitations` e `Verification Matrix`) foi revisada e aprovada pelo usuário em 2026-10-21 antes da ativação**, com as decisões: sem aviso nem cifragem dos demais campos (só a senha é o dado sensível), política de clipboard como descrita, revelar com auto-ocultar, plano mantido inteiro (sem divisão), ADR-0007 criado nesta entrega e `vault-entries` autorizada em `authorized_capabilities`. Este plano não altera API, banco nem contrato (só consome os endpoints de cofre existentes) e não muda criptografia nem controle de acesso por role; toca o tratamento de segredos no cliente web, registrado no ADR-0007.
 
 ## Acceptance Criteria
 
