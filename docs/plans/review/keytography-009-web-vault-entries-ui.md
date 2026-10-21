@@ -1,6 +1,6 @@
 ---
 id: keytography-009
-status: active
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
@@ -65,6 +65,18 @@ O tratamento de segredos no cliente web (cache, revelar, clipboard, formulários
 
 Ativado e aprovado pelo usuário em 2026-10-21, ao pedir explicitamente a ativação e a implementação deste plano (o próximo da fila do `ROADMAP.md`), depois da revisão do Design Gate registrada no PR #33. **A seção `Invariants And Failure Modes` (com `Known Limitations` e `Verification Matrix`) foi revisada e aprovada pelo usuário em 2026-10-21 antes da ativação**, com as decisões: sem aviso nem cifragem dos demais campos (só a senha é o dado sensível), política de clipboard como descrita, revelar com auto-ocultar, plano mantido inteiro (sem divisão), ADR-0007 criado nesta entrega e `vault-entries` autorizada em `authorized_capabilities`. Este plano não altera API, banco nem contrato (só consome os endpoints de cofre existentes) e não muda criptografia nem controle de acesso por role; toca o tratamento de segredos no cliente web, registrado no ADR-0007.
 
+## Implementation Clarifications
+
+Ajustes de meio, derivados das invariantes já aprovadas (2026-10-21), sem alterar objetivo nem critérios de aceite:
+
+- **`autocomplete` da senha:** o campo de senha dos formulários usa `autocomplete="new-password"` em vez de `off` (os navegadores ignoram `off` em campos de senha; `new-password` é o valor suportado para não preencher nem oferecer salvar). Os demais campos (título, login, nome e valor de campo adicional, confirmação) usam `off`, e a senha mostrada no detalhe e no histórico também. Registrado no ADR-0007.
+- **Resultado das mutações:** além de `gcTime: 0`, a camada de acesso (`vault-api.ts`) devolve de criar e editar **só o `id`**, porque a resposta do servidor traz a senha em texto e o cache de mutações a reteria; é a aplicação direta da invariante "cache sem senha" às mutações.
+- **Mover para a lixeira** (exclusão reversível) não pede confirmação digitada (o plano só a exige para a exclusão definitiva); avisa por toast e volta à lista. A palavra de confirmação é `EXCLUIR` (sem diferenciar maiúsculas).
+- **Histórico** só é buscado quando a pessoa o abre (as senhas anteriores não são decifradas e trafegadas à toa).
+- **Link direto para uma entrada da lixeira:** a API devolve o detalhe de entradas excluídas e o detalhe não informa que ela está na lixeira, então `/vault/:id` abre o detalhe; a interface só não **oferece** esse caminho (a lixeira não tem link). Entra em `Known Limitations`.
+- **Novo primitivo** `ui/dialog` (Radix) e `ui/skeleton`; o clipboard de segredos vive em `lib/secret-clipboard.ts` (infraestrutura compartilhada pelos planos 010 a 013) e o `SessionController` o limpa no logout e na expiração.
+- **Verificação manual (2026-10-21)**, contra a API real (banco descartável) no navegador, pelo roteiro de `docs/guides/running-locally.md`: lista vazia, criar com campo adicional, detalhe com a senha oculta, revelar e voltar a ocultar sozinha em 30 s (medido: visível aos 15 s, oculta aos 32 s), recarregar a página (F5) na edição restaura a sessão e abre o formulário com os dados do servidor, editar a senha e ver a anterior no histórico (oculta), mover para a lixeira, restaurar, excluir definitivamente com a palavra digitada, nada em `localStorage`/`sessionStorage` e URL só com o id, reinício da API (cofre sem DEK): ao salvar, a interface leva ao login com "Sua sessão expirou", sem a senha na tela, e avisa a API (logout 204). **Não verificado manualmente:** o caminho de sucesso do clipboard e sua limpeza (o painel do navegador usado nega a permissão de escrita, e a interface mostrou corretamente a mensagem de indisponibilidade); esse comportamento e a troca de conta entre abas são cobertos por teste automatizado (clipboard simulado; o mecanismo de troca de conta foi verificado manualmente no `017`).
+
 ## Acceptance Criteria
 
 - Criar uma entrada de cofre e vê-la aparecer na listagem imediatamente, sem recarregar a página; criar com senha vazia ou com nomes de campo adicional vazios ou duplicados é recusado no formulário.
@@ -127,24 +139,30 @@ Aceitas pelo usuário em 2026-10-21 (revisão do plano antes da ativação):
 - **Sem busca, filtro nem paginação:** a lista vem inteira, na ordem de atualização da API; a lixeira não mostra a data de exclusão (a API não a devolve).
 - **Rascunho de formulário não sobrevive** ao fim da sessão (deliberado: não persistir segredos).
 - A senha revelada fica visível por até 30 s.
+- Um link direto para uma entrada da lixeira abre o detalhe (a API o devolve e não informa que a entrada está excluída); a interface só não oferece esse caminho.
 
 ## Verification Matrix
 
-| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+Testes em `web/src/features/vault/` (`vault-flows.test.tsx`, `vault-secrets.test.tsx`) e `web/src/lib/secret-clipboard.test.ts`; cada linha foi provada observando o teste falhar com a mutação indicada.
+
+| Invariante ou critério | Teste | Prova de que o teste falha sem o comportamento |
 | --- | --- | --- |
-| Nada de senha em storage, URL, título ou `console.*` | teste de fluxo: criar, editar, revelar, copiar e inspecionar `localStorage`, `sessionStorage`, URL e `console` | mutação: gravar o rascunho em `sessionStorage`; logar a resposta |
-| Cache sem senha | teste que sai da tela e inspeciona o cache | mutação: `gcTime` padrão; `setQueryData` com o detalhe |
-| Fim de sessão e troca de conta limpam tudo | teste com tela montada + `signOut`, expiração e troca de conta | mutação: remover o reset de consultas; não descartar o formulário |
-| Revelar é temporário (30 s, aba oculta, sair da tela) | teste com relógio falso e `visibilitychange` | mutação: sem timer; sem o listener |
-| Clipboard: limpa só o que copiou; leitura negada limpa; sem foco fica pendente; copiar de novo substitui; logout limpa | testes com relógio falso, clipboard e foco simulados | mutações: limpar sempre; não ler antes; limpar sem foco; não cancelar a pendente |
-| Mutação não duplica | teste de duplo clique com API lenta | mutação: não desabilitar o controle |
-| Edição abre com detalhe fresco e envia todos os campos | teste com lista desatualizada e campos adicionais | mutação: abrir com dado da lista; omitir campos |
-| Senha vazia e nomes de campo vazios ou duplicados recusados | teste do formulário | mutação: remover a validação |
-| Exclusão definitiva só na lixeira e com confirmação | teste do diálogo e da rota | mutação: oferecer fora da lixeira; aceitar texto vazio |
-| `404` idempotente em restaurar e excluir | teste com API respondendo 404 | mutação: tratar como erro |
-| Id inválido ou de outro usuário → "não encontrada" | teste de rota com 404 e 403 | mutação: expor o status |
-| Valores como texto e `autocomplete` desligado | teste com valor `<img onerror>` e `javascript:` | mutação: `dangerouslySetInnerHTML`; remover o atributo |
-| Estados carregando, vazio e erro | testes de componente | mutação: renderizar vazio no erro |
+| Nada de senha em storage, URL, título ou `console.*` | `vault-secrets`: criar, ver, revelar, copiar, histórico e editar sem vazar | mutações: gravar a senha em `sessionStorage`; `console.log` dos valores |
+| Cache sem senha (detalhe e histórico `gcTime: 0`; mutações devolvem só o `id`, `gcTime: 0`) | `vault-secrets`: sai do cache ao deixar a tela; resultado das mutações; cache de mutações | mutações: sem `gcTime: 0` (detalhe, histórico, mutações); a mutação devolver a resposta inteira |
+| Fim de sessão, expiração e troca de conta limpam a tela | `vault-secrets`: senha some com `401` persistente, sessão rejeitada, troca de conta; chamada recusada pelo cliente | mutações do `017` e remoção do reset de consultas |
+| Revelar é temporário (30 s, aba oculta, sair da tela) | `vault-secrets` (relógio falso, `visibilitychange`, navegação) | mutações: 60 s; sem timer; sem o listener |
+| Clipboard: limpa só o que copiou; leitura negada limpa; sem foco fica pendente e roda uma vez; copiar de novo substitui; logout e expiração limpam | `secret-clipboard.test.ts` e `vault-secrets` | mutações: limpar sempre; não ler antes; limpar sem foco; não cancelar a pendente; `SessionController` sem a limpeza |
+| Mutação não duplica | `vault-flows`: duplo clique em criar, mover para a lixeira, restaurar e confirmar exclusão | mutações: remover as defesas (botão desabilitado e guarda) de cada operação |
+| Edição abre com detalhe fresco e envia todos os campos | `vault-flows`: edição com lista desatualizada; remover campos envia `null` | mutação: não enviar `additionalFields` |
+| Senha vazia e nomes de campo vazios ou duplicados recusados | `vault-flows`: formulário de criação | mutações: remover cada validação |
+| Exclusão definitiva só na lixeira e só com a palavra digitada | `vault-flows`: diálogo (vazio, errado, certo, cancelar), ausência do botão na lista e no detalhe | mutação: confirmação sempre válida |
+| `404` idempotente em restaurar e excluir definitivamente | `vault-flows` | mutação: tratar `404` como erro |
+| Id inexistente, inválido ou de outro usuário → "não encontrada" | `vault-flows` (`404`, `403`, id que não é GUID) | mutação: distinguir o `403` |
+| Valores como texto e `autocomplete` correto | `vault-secrets`: título e campos hostis; atributos dos campos | mutações: `dangerouslySetInnerHTML`; remover cada `autocomplete` |
+| Histórico só quando pedido | `vault-flows`: nenhuma chamada antes do clique | mutação: buscar sempre |
+| Estados carregando, vazio e erro | `vault-flows` (lista, detalhe, edição, lixeira, histórico) | testes de cada estado |
+
+**Mutantes equivalentes ou inofensivos conhecidos** (sobrevivem sem indicar lacuna): cada operação de mutação tem mais de uma defesa contra duplo clique (botão desabilitado e guarda no handler, e na exclusão definitiva ainda o diálogo e a página): remover uma só não altera o resultado, remover todas é detectado; o descarte explícito de detalhe e histórico depois de uma mudança foi removido por ser redundante com o `gcTime: 0` (a mutação o provou).
 
 ## Documentation Updates
 

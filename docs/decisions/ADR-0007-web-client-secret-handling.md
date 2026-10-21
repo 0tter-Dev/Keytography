@@ -1,0 +1,41 @@
+# ADR-0007: Tratamento de segredos no cliente web
+
+## Context
+
+A interface web exibe e manipula a senha de contas de terceiros guardadas no cofre (`keytography-009` em diante: cofre, avaliação, geração, troca de senha, supervisão do Admin). O backend decifra a senha e a devolve em texto no detalhe, no histórico e nas respostas de criar e editar ([ADR-0001](./ADR-0001-vault-encryption-and-recovery.md)); o servidor só mantém a DEK em memória por sessão ([ADR-0002](./ADR-0002-dek-session-cache.md), [ADR-0006](./ADR-0006-backend-managed-sessions.md)). A segurança do cofre, portanto, também depende do que o cliente faz com o segredo depois de recebê-lo: cache, tela, clipboard, formulários e logs. Essas regras atravessam vários planos e capabilities, e uma decisão por tela produziria políticas diferentes para o mesmo dado.
+
+## Decision
+
+1. **O segredo só vive na memória da aba.** A senha (detalhe, histórico, formulário, resposta de mutação) nunca vai para `localStorage`, `sessionStorage`, URL, título da página nem `console.*`. Rascunhos de formulário não são persistidos.
+2. **Consultas que trazem senha não ficam em cache.** Detalhe e histórico usam `gcTime: 0` (saem da memória assim que a tela é deixada) e são sempre buscados na hora; as listas (título, login, data) não têm segredo e usam o cache normal. As mutações também usam `gcTime: 0` e **devolvem só o `id`**: a resposta do servidor, que traz a senha, é descartada na camada de acesso e nunca vai para `setQueryData` nem para o cache de mutações.
+3. **Fim de sessão, troca de conta e saída da tela limpam tudo.** Valores revelados voltam a ocultos, formulários e diálogos são descartados, e o cache de consultas é esvaziado ou redefinido pelo `SessionController` ([ADR-0006](./ADR-0006-backend-managed-sessions.md), item 13).
+4. **Revelar é temporário.** A senha vem oculta; revelada, volta a ocultar em **30 segundos**, quando a aba fica oculta e ao sair da tela. Cada segredo tem o seu estado (revelar uma senha do histórico não revela as outras).
+5. **Clipboard (melhor esforço).** Copiar um segredo agenda a limpeza em **20 segundos**: com a página em foco, lê o clipboard e só o limpa se ainda tiver o conteúdo copiado (se a leitura for negada, limpa assim mesmo); sem foco (o navegador recusa escrever), a limpeza fica pendente e roda **uma vez** quando a janela volta a ter foco; copiar de novo substitui a pendente; logout e expiração da sessão limpam a pendente na hora. Clipboard indisponível (contexto não seguro, permissão negada) mostra mensagem clara, nunca falha em silêncio.
+6. **Formulários não disparam o gerenciador de senhas do navegador.** O campo de senha de uma entrada usa `autocomplete="new-password"` (o valor que os navegadores respeitam; `off` é ignorado em campos de senha) e os demais campos `autocomplete="off"`: a senha de uma entrada não é uma credencial do próprio Keytography.
+7. **Renderização segura.** Valores do usuário (título, login, campos adicionais) saem como texto: nada de `dangerouslySetInnerHTML` e nenhum link automático.
+8. **Mutações não são reenviadas pela interface** (um envio por vez; botões desabilitados durante o envio); a repetição automática do cliente só ocorre depois de um 401, quando a chamada não foi processada ([ADR-0006](./ADR-0006-backend-managed-sessions.md)). Uma chamada recusada pelo cliente por troca de conta nunca é exibida como sucesso.
+
+## Consequences
+
+- Todo plano de interface que exibe um segredo segue estas regras; os testes de cada tela provam as invariantes por mutação (`Verification Matrix` do plano).
+- **Limitações aceitas:**
+  - A limpeza do clipboard é melhor esforço: com a leitura negada pode sobrescrever uma cópia feita pelo usuário nos 20 s; sem foco só roda quando a aba volta; fechar a aba antes deixa o valor no clipboard; outros aplicativos podem lê-lo nesse intervalo.
+  - A senha revelada fica visível por até 30 s.
+  - Só a senha é cifrada no backend ([ADR-0001](./ADR-0001-vault-encryption-and-recovery.md)); título, login e campos adicionais ficam em texto no banco, e a interface não avisa sobre isso (decisão do usuário: a senha é o dado sensível).
+  - Rascunhos de formulário não sobrevivem ao fim da sessão (deliberado).
+- Mudar o valor do auto-ocultar (30 s) ou da limpeza do clipboard (20 s) é uma decisão de produto registrada aqui, com testes que fixam os valores.
+
+## Alternatives Considered
+
+- **Guardar a senha no cache de consultas com o `gcTime` padrão (5 minutos):** rejeitado: a senha ficaria em memória, fora da tela, por minutos depois de ser exibida.
+- **Persistir rascunhos de formulário em `sessionStorage`:** rejeitado: guardaria a senha digitada fora da memória.
+- **Limpar o clipboard sem ler antes:** rejeitado como padrão: apagaria uma cópia feita pelo usuário; só é usado quando a leitura é negada, para não deixar o segredo para trás.
+- **Não limpar o clipboard:** rejeitado: o segredo ficaria à disposição de qualquer aplicativo indefinidamente.
+- **`autocomplete="off"` na senha do formulário:** rejeitado: os navegadores o ignoram em campos de senha; `new-password` é o valor suportado para não preencher nem oferecer salvar.
+
+## Canonical Links
+
+- [docs/decisions/ADR-0001-vault-encryption-and-recovery.md](./ADR-0001-vault-encryption-and-recovery.md)
+- [docs/decisions/ADR-0002-dek-session-cache.md](./ADR-0002-dek-session-cache.md)
+- [docs/decisions/ADR-0006-backend-managed-sessions.md](./ADR-0006-backend-managed-sessions.md)
+- [docs/guides/web-frontend-conventions.md](../guides/web-frontend-conventions.md)

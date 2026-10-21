@@ -189,6 +189,19 @@ Roteiro repetível (o usado na verificação manual do `keytography-017`), com u
 
 7. Troca de conta: entre como o usuário A na aba 1, e como outro usuário B na aba 2 do mesmo navegador; ao renovar (ou numa nova chamada), a aba 1 avisa e passa a mostrar B.
 
+### Verificando o cofre na interface web
+
+Roteiro repetível (o usado na verificação manual do `keytography-009`), com a API local e um usuário de teste já verificado (ver os roteiros acima):
+
+1. Entre pela interface e abra **Cofre** na navegação: a lista vem vazia, com o estado vazio e o botão **Nova entrada**.
+2. Crie uma entrada com título, login, senha e um campo adicional (ex.: `URL`): você é levado ao detalhe, com a senha **oculta**; ela aparece em **Mostrar senha** e volta a ficar oculta sozinha depois de 30 s ou ao trocar de aba do navegador.
+3. **Copiar senha**: cole em outro lugar; depois de ~20 s, com a janela em foco, o clipboard fica vazio (se você estiver em outra janela, ele limpa quando você volta ao navegador). Copie e clique em **Sair**: o clipboard é limpo na hora.
+4. **Editar**: o formulário abre com os dados atuais (inclusive o campo adicional); troque a senha, salve e abra **Ver histórico de senhas**: a senha anterior aparece oculta, com a data da troca.
+5. **Mover para a lixeira**, abra **Lixeira**, **Restaurar** (a entrada volta à lista) e mova de novo; **Excluir definitivamente** pede digitar `EXCLUIR` e a entrada some de vez.
+6. No painel do navegador, confira que **Application → Local/Session storage** não tem a senha e que a URL é só `/vault/<id>`.
+7. Reinício da API: com a API rodando, abra o detalhe de uma entrada, pare e suba a API de novo e clique em **Editar** e **Salvar**: o servidor responde 401 por falta da DEK em cache e a interface leva ao login com o aviso de sessão expirada, sem mostrar a senha.
+8. Troca de conta entre abas: na aba 1 entre como A e abra uma entrada; na aba 2 entre como B; ao renovar a sessão (ou numa nova chamada), a aba 1 avisa e volta ao início, e a senha de A não permanece na tela.
+
 **Scripts úteis (em `web/`):**
 
 | Comando | O que faz |

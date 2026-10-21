@@ -129,5 +129,110 @@
     "accountChanged": "Você entrou com outra conta em outra aba ou janela. Agora esta aba mostra a conta atual.",
     "restoreUnreachable": "Não foi possível falar com o servidor para restaurar a sua sessão. Tente novamente em instantes.",
     "logoutUnreachable": "Você saiu neste dispositivo, mas não foi possível avisar o servidor: a sessão dele pode continuar ativa até expirar."
+  },
+  "vault": {
+    "title": "Cofre",
+    "list": {
+      "description": "Suas contas e senhas guardadas.",
+      "new": "Nova entrada",
+      "trash": "Lixeira",
+      "noLogin": "Sem login",
+      "updatedAt": "Atualizada em {{date}}",
+      "empty": {
+        "title": "Nenhuma entrada ainda",
+        "description": "Crie a primeira entrada para guardar uma conta e a senha dela."
+      }
+    },
+    "loading": "Carregando…",
+    "loadError": {
+      "title": "Não foi possível carregar",
+      "description": "Verifique a conexão e tente de novo.",
+      "retry": "Tentar novamente"
+    },
+    "notFound": {
+      "title": "Entrada não encontrada",
+      "description": "Ela não existe ou você não tem acesso a ela.",
+      "back": "Voltar ao cofre"
+    },
+    "form": {
+      "newTitle": "Nova entrada",
+      "editTitle": "Editar entrada",
+      "fields": {
+        "title": "Título",
+        "login": "Login",
+        "password": "Senha",
+        "additionalFields": "Campos adicionais",
+        "fieldName": "Nome do campo",
+        "fieldValue": "Valor"
+      },
+      "addField": "Adicionar campo",
+      "removeField": "Remover campo {{position}}",
+      "submitCreate": "Criar entrada",
+      "submitUpdate": "Salvar alterações",
+      "submitting": "Salvando…",
+      "cancel": "Cancelar",
+      "validation": {
+        "titleRequired": "Informe um título.",
+        "passwordRequired": "Informe a senha.",
+        "fieldNameRequired": "Informe o nome do campo.",
+        "fieldNameDuplicate": "Já existe um campo com este nome."
+      },
+      "errors": {
+        "network": "Não foi possível falar com o servidor. Seus dados continuam no formulário; tente de novo.",
+        "unknown": "Não foi possível salvar. Seus dados continuam no formulário; tente de novo.",
+        "notFound": "Esta entrada não existe mais."
+      }
+    },
+    "detail": {
+      "edit": "Editar",
+      "delete": "Mover para a lixeira",
+      "deleted": "Entrada movida para a lixeira.",
+      "deleteFailed": "Não foi possível mover a entrada para a lixeira.",
+      "showHistory": "Ver histórico de senhas",
+      "hideHistory": "Ocultar histórico de senhas",
+      "createdAt": "Criada em {{date}}",
+      "updatedAt": "Atualizada em {{date}}",
+      "additionalFields": "Campos adicionais",
+      "back": "Voltar ao cofre"
+    },
+    "secret": {
+      "show": "Mostrar {{label}}",
+      "hide": "Ocultar {{label}}"
+    },
+    "copy": {
+      "label": "Copiar {{what}}",
+      "done": "Copiado. A área de transferência será limpa em {{seconds}} segundos.",
+      "unavailable": "A área de transferência não está disponível neste navegador ou neste endereço."
+    },
+    "history": {
+      "title": "Histórico de senhas",
+      "empty": "A senha desta entrada nunca foi trocada.",
+      "changedAt": "Trocada em {{date}}",
+      "loadError": "Não foi possível carregar o histórico."
+    },
+    "trash": {
+      "title": "Lixeira",
+      "description": "Entradas excluídas. Restaure ou exclua de vez.",
+      "empty": {
+        "title": "A lixeira está vazia",
+        "description": "As entradas que você mover para a lixeira aparecem aqui."
+      },
+      "restore": "Restaurar",
+      "restored": "Entrada restaurada.",
+      "restoreFailed": "Não foi possível restaurar a entrada.",
+      "deletePermanently": "Excluir definitivamente",
+      "deleted": "Entrada excluída definitivamente.",
+      "deleteFailed": "Não foi possível excluir a entrada.",
+      "back": "Voltar ao cofre"
+    },
+    "confirmDelete": {
+      "title": "Excluir definitivamente?",
+      "description": "Esta ação não pode ser desfeita: a entrada e o histórico de senhas dela serão apagados. Digite {{word}} para confirmar.",
+      "word": "EXCLUIR",
+      "label": "Confirmação",
+      "cancel": "Cancelar",
+      "confirm": "Excluir definitivamente",
+      "deleting": "Excluindo…"
+    }
   }
 }
