@@ -11,7 +11,7 @@ import { CopyButton } from './CopyButton'
 import { EntryHistory } from './EntryHistory'
 import { EntryNotFound } from './EntryNotFound'
 import { SecretValue } from './SecretValue'
-import { isUnexplainedUnauthorized } from './vault-feedback'
+import { captureSessionContext, isUnexplainedUnauthorized } from './vault-feedback'
 import { VaultError } from './vault-api'
 import { VaultLoadError } from './VaultLoadError'
 import { VaultLoading } from './VaultLoading'
@@ -39,7 +39,7 @@ function EntryDetail({ id }: { id: string }) {
     return entry.error instanceof VaultError && entry.error.failure === 'notFound' ? (
       <EntryNotFound />
     ) : (
-      <VaultLoadError onRetry={() => void entry.refetch()} />
+      <VaultLoadError heading onRetry={() => void entry.refetch()} />
     )
   }
 
@@ -50,6 +50,7 @@ function EntryDetail({ id }: { id: string }) {
     if (softDelete.isPending) {
       return
     }
+    const startedIn = captureSessionContext()
     try {
       await softDelete.mutateAsync(id)
       toast.success(t('vault.detail.deleted'))
@@ -57,7 +58,7 @@ function EntryDetail({ id }: { id: string }) {
     } catch (error) {
       setConfirmingTrash(false)
       // Um `unauthorized` que o cliente já explica (sessão encerrada, conta trocada) não ganha toast.
-      if (isUnexplainedUnauthorized(error)) {
+      if (isUnexplainedUnauthorized(error, startedIn)) {
         toast.warning(t('vault.errors.unauthorized'))
       } else if (!(error instanceof VaultError && error.failure === 'unauthorized')) {
         toast.error(t('vault.detail.deleteFailed'))

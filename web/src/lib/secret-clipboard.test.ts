@@ -286,3 +286,44 @@ describe('cópia em andamento durante o logout ou outra cópia', () => {
     expect(clipboard.content).toBe('')
   })
 })
+
+describe('cópias que se sobrepõem', () => {
+  it('copiar de novo enquanto a leitura da cópia anterior está pendente: a leitura velha não apaga a nova', async () => {
+    const clipboard = installClipboard()
+    await copySecret('primeiro')
+    let finishRead: (text: string) => void = () => {}
+    clipboard.readText?.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finishRead = resolve
+        }),
+    )
+
+    await advance(20_001) // a limpeza da primeira começa e fica esperando a leitura
+    await copySecret('segundo') // outra cópia assume o clipboard
+    finishRead('primeiro') // a leitura velha termina com o texto da primeira
+    await advance(0)
+
+    expect(clipboard.content).toBe('segundo') // não foi apagada pela limpeza da primeira
+  })
+
+  it('a cópia mais nova falha: a anterior, que terminou depois, continua com a limpeza agendada', async () => {
+    const clipboard = installClipboard()
+    let finishFirst: () => void = () => {}
+    clipboard.writeText.mockImplementationOnce(async (text: string) => {
+      await new Promise<void>((resolve) => {
+        finishFirst = resolve
+      })
+      clipboard.content = text
+    })
+    clipboard.writeText.mockRejectedValueOnce(new DOMException('negado', 'NotAllowedError'))
+
+    const first = copySecret('primeiro') // escrita lenta
+    expect(await copySecret('segundo')).toBe('unavailable') // a mais nova é recusada
+    finishFirst()
+    expect(await first).toBe('copied')
+
+    await advance(20_001)
+    expect(clipboard.content).toBe('') // a primeira foi limpa no prazo
+  })
+})

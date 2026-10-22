@@ -199,7 +199,7 @@ Roteiro repetível (o usado na verificação manual do `keytography-009`), com a
 4. **Editar**: o formulário abre com os dados atuais (inclusive o campo adicional); troque a senha, salve e abra **Ver histórico de senhas**: a senha anterior aparece oculta, com a data da troca.
 5. **Mover para a lixeira** (o diálogo pede confirmação; **Cancelar** não move nada), abra **Lixeira**, **Restaurar** (a entrada volta à lista) e mova de novo; **Excluir definitivamente** pede digitar `EXCLUIR` e a entrada some de vez.
 6. No painel do navegador, confira que **Application → Local/Session storage** não tem a senha e que a URL é só `/vault/<id>`.
-7. Reinício da API: com a API rodando, abra o detalhe de uma entrada, pare e suba a API de novo e clique em **Editar** e **Salvar**: o servidor responde 401 por falta da DEK em cache e a interface leva ao login com o aviso de sessão expirada, sem mostrar a senha.
+7. Reinício da API: com a API rodando, abra o detalhe de uma entrada, pare e suba a API de novo e clique em **Editar**: o servidor responde 401 ao buscar o detalhe por falta da DEK em cache (a edição tem consulta própria, então o erro aparece já ao abrir) e a interface leva ao login com o aviso de sessão expirada, sem mostrar a senha.
 8. Troca de conta entre abas: na aba 1 entre como A e abra uma entrada; na aba 2 entre como B; ao renovar a sessão (ou numa nova chamada), a aba 1 avisa e volta ao início, e a senha de A não permanece na tela.
 
 **Scripts úteis (em `web/`):**

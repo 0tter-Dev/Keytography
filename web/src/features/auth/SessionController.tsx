@@ -52,6 +52,8 @@ export function SessionController() {
           // Um segredo copiado e ainda não limpo não pode sobreviver ao fim da sessão (ADR-0007).
           void clearPendingClipboard()
         } else if (accountSwitched) {
+          // Um segredo copiado da conta anterior também não pode ficar para a conta nova.
+          void clearPendingClipboard()
           // `clear()` não alcança telas já montadas: elas continuariam exibindo o dado da conta
           // anterior. `resetQueries` apaga o dado e refaz as consultas ativas já como a conta nova.
           void queryClient.resetQueries()

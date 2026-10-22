@@ -29,8 +29,10 @@ type Pending = {
 let pending: Pending | null = null
 /** Sobe a cada `clearPendingClipboard`: uma cópia iniciada antes dele não deve sobreviver. */
 let generation = 0
-/** Sobe a cada cópia: só a mais recente agenda a limpeza. */
+/** Número de ordem de cada cópia (para saber qual é a mais nova). */
 let copySequence = 0
+/** Ordem da cópia que agendou a limpeza atual: uma cópia mais VELHA que termina depois não a toma. */
+let scheduledSequence = 0
 
 export function isClipboardAvailable(): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function'
@@ -44,6 +46,7 @@ export function resetSecretClipboard(): void {
   pending = null
   generation = 0
   copySequence = 0
+  scheduledSequence = 0
   window.removeEventListener('focus', onFocus)
 }
 
@@ -65,9 +68,10 @@ export async function copySecret(text: string): Promise<'copied' | 'unavailable'
     await writeEmpty()
     return 'unavailable'
   }
-  if (sequence !== copySequence) {
-    return 'copied' // uma cópia mais nova assumiu a limpeza
+  if (sequence < scheduledSequence) {
+    return 'copied' // uma cópia mais nova (que terminou antes) já assumiu a limpeza
   }
+  scheduledSequence = sequence
 
   dropPending()
   const entry: Pending = { text, timer: null, waitingForFocus: false }

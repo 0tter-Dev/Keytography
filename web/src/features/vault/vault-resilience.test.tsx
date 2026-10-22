@@ -1,8 +1,19 @@
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ptBR from '@/i18n/locales/pt-BR.json'
-import { ENTRY, ID, ID2, callsTo, detailHandler, listItem, renderVault } from './vault-test-support'
+import { useSessionStore } from '@/features/auth/session-store'
+import {
+  ENTRY,
+  ID,
+  ID2,
+  OTHER,
+  callsTo,
+  detailHandler,
+  listItem,
+  renderVault,
+} from './vault-test-support'
 
 const { vault } = ptBR
 const SECOND = { ...ENTRY, id: ID2, title: 'Streaming', login: null, additionalFields: null }
@@ -524,5 +535,176 @@ describe('lixeira: duplo clique e confirmação', () => {
 
     expect(within(dialog).getByLabelText(vault.confirmDelete.label)).toHaveValue('')
     expect(within(dialog).getByRole('button', { name: vault.confirmDelete.confirm })).toBeDisabled()
+  })
+})
+
+/** Espera a tela reagir a um refetch (o `react-query` notifica os observadores depois do `act`). */
+async function refetchAndSettle(
+  client: { refetchQueries: (filters: { queryKey: string[] }) => Promise<void> },
+  key: string[],
+) {
+  await act(async () => {
+    await client.refetchQueries({ queryKey: key })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+}
+
+describe('um refetch que falha não apaga listas nem histórico já na tela', () => {
+  it('a lista do cofre continua depois de um refetch com erro', async () => {
+    let failing = false
+    const { client } = renderVault(
+      { 'GET /vault/entries': () => (failing ? { status: 500 } : { body: [listItem(ENTRY)] }) },
+      '/vault',
+    )
+    await screen.findByRole('link', { name: /Banco/ })
+
+    failing = true
+    await refetchAndSettle(client, ['vault', 'entries'])
+
+    expect(client.getQueryCache().find({ queryKey: ['vault', 'entries'] })?.state.status).toBe(
+      'error',
+    )
+    expect(screen.queryByText(vault.loadError.title)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Banco/ })).toBeInTheDocument()
+  })
+
+  it('a lixeira continua depois de um refetch com erro (a invalidação que falha não esconde a lista)', async () => {
+    let failing = false
+    const { client } = renderVault(
+      {
+        'GET /vault/entries/trash': () =>
+          failing ? { status: 500 } : { body: [listItem(SECOND)] },
+      },
+      '/vault/trash',
+    )
+    await screen.findByText('Streaming')
+
+    failing = true
+    await refetchAndSettle(client, ['vault', 'trash'])
+
+    expect(client.getQueryCache().find({ queryKey: ['vault', 'trash'] })?.state.status).toBe(
+      'error',
+    )
+    expect(screen.queryByText(vault.loadError.title)).not.toBeInTheDocument()
+    expect(screen.getByText('Streaming')).toBeInTheDocument()
+  })
+
+  it('o histórico (com uma senha revelada) continua depois de um refetch com erro', async () => {
+    let failing = false
+    const { client } = renderVault(
+      {
+        [`GET /vault/entries/${ID}`]: detailHandler(ENTRY),
+        [`GET /vault/entries/${ID}/history`]: () =>
+          failing
+            ? { status: 500 }
+            : { body: [{ id: 'h1', password: 'senha-antiga', changedAt: '2026-10-01T10:00:00Z' }] },
+      },
+      `/vault/${ID}`,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: vault.detail.showHistory }))
+    await userEvent.click(await screen.findByRole('button', { name: /Mostrar senha \(trocada em/ }))
+
+    failing = true
+    await refetchAndSettle(client, ['vault', 'history'])
+
+    expect(screen.queryByText(vault.history.loadError)).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue('senha-antiga')).toBeInTheDocument()
+  })
+
+  it('a edição não refaz a busca em segundo plano ao voltar o foco ou a conexão', async () => {
+    const { calls } = renderVault(
+      { [`GET /vault/entries/${ID}`]: detailHandler(ENTRY) },
+      `/vault/${ID}/edit`,
+    )
+    await screen.findByLabelText(vault.form.fields.title)
+    const reads = () => callsTo(calls, 'GET', `/vault/entries/${ID}`).length
+
+    await act(async () => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+      onlineManager.setOnline(false)
+      onlineManager.setOnline(true)
+      await new Promise((resolve) => setTimeout(resolve, 30))
+    })
+    focusManager.setFocused(undefined)
+
+    expect(reads()).toBe(1)
+  })
+})
+
+describe('chamada recusada por troca de conta: só o aviso do cliente de sessão', () => {
+  /** A conta ficou "por conferir" e `/auth/me` revela outra conta: o cliente recusa a chamada. */
+  const switchAccountUnderneath = () => act(() => useSessionStore.setState({ unverified: true }))
+
+  it('restaurar na lixeira não mostra o aviso de "nada foi feito" (só o da troca de conta)', async () => {
+    renderVault(
+      {
+        'GET /vault/entries/trash': { body: [listItem(SECOND)] },
+        [`POST /vault/entries/${ID2}/restore`]: { status: 204 },
+        'GET /auth/me': { body: OTHER },
+      },
+      '/vault/trash',
+    )
+    const restore = await screen.findByRole('button', { name: /Restaurar: Streaming/ })
+    switchAccountUnderneath()
+    await userEvent.click(restore)
+
+    expect(await screen.findByText(ptBR.auth.accountChanged)).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument()
+    expect(screen.queryByText(vault.trash.restoreFailed)).not.toBeInTheDocument()
+  })
+
+  it('mover para a lixeira também não mostra o aviso de "nada foi feito"', async () => {
+    renderVault(
+      {
+        [`GET /vault/entries/${ID}`]: detailHandler(ENTRY),
+        [`DELETE /vault/entries/${ID}`]: { status: 204 },
+        'GET /auth/me': { body: OTHER },
+      },
+      `/vault/${ID}`,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: vault.detail.delete }))
+    const dialog = await screen.findByRole('dialog')
+    switchAccountUnderneath()
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: vault.detail.confirmTrash.confirm }),
+    )
+
+    expect(await screen.findByText(ptBR.auth.accountChanged)).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument()
+  })
+})
+
+describe('telas de erro com título de nível 1 e campos de senha sem corretor', () => {
+  it('"não encontrada" e a falha de carregar o detalhe ou a edição têm um h1', async () => {
+    renderVault({ [`GET /vault/entries/${ID}`]: { status: 404 } }, `/vault/${ID}`)
+    expect(
+      await screen.findByRole('heading', { level: 1, name: vault.notFound.title }),
+    ).toBeInTheDocument()
+  })
+
+  it('a falha de carregar o detalhe tem um h1', async () => {
+    renderVault({ [`GET /vault/entries/${ID}`]: { status: 500 } }, `/vault/${ID}`)
+    expect(
+      await screen.findByRole('heading', { level: 1, name: vault.loadError.title }),
+    ).toBeInTheDocument()
+  })
+
+  it('a falha de carregar a edição tem um h1', async () => {
+    renderVault({ [`GET /vault/entries/${ID}`]: { status: 500 } }, `/vault/${ID}/edit`)
+    expect(
+      await screen.findByRole('heading', { level: 1, name: vault.loadError.title }),
+    ).toBeInTheDocument()
+  })
+
+  it('o campo de senha do formulário não passa pelo corretor ortográfico', async () => {
+    renderVault({}, '/vault/new')
+
+    expect(await screen.findByLabelText(vault.form.fields.password)).toHaveAttribute(
+      'spellcheck',
+      'false',
+    )
   })
 })

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { VaultError, type EntryInput, type VaultFailure } from './vault-api'
-import { unauthorizedNeedsNotice } from './vault-feedback'
+import { captureSessionContext, isUnexplainedUnauthorized } from './vault-feedback'
 import { toEntryInput, type EntryFormValues } from './vault-schemas'
 
 type Save = { mutateAsync: (input: EntryInput) => Promise<{ id: string }>; isPending: boolean }
@@ -24,6 +24,7 @@ export function useEntrySubmit(save: Save) {
     }
     setFailure(null)
     setTitleError(undefined)
+    const startedIn = captureSessionContext()
     try {
       const { id } = await save.mutateAsync(toEntryInput(values))
       navigate(`/vault/${id}`)
@@ -33,7 +34,9 @@ export function useEntrySubmit(save: Save) {
         setTitleError(t('vault.form.validation.titleRequired'))
       }
       setFailure(
-        cause.failure === 'unauthorized' && !unauthorizedNeedsNotice() ? null : cause.failure,
+        cause.failure === 'unauthorized' && !isUnexplainedUnauthorized(cause, startedIn)
+          ? null
+          : cause.failure,
       )
     }
   }

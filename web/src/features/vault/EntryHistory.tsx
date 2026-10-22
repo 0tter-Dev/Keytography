@@ -12,7 +12,8 @@ export function EntryHistory({ id }: { id: string }) {
   if (history.isPending) {
     return <VaultLoading rows={2} />
   }
-  if (history.isError) {
+  // Só é erro se NÃO há dado: um refetch que falha não apaga o histórico já na tela.
+  if (!history.data) {
     return (
       <p role="alert" className="text-sm">
         {t('vault.history.loadError')}

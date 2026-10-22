@@ -88,6 +88,16 @@ describe('revelar uma senha é temporário', () => {
     expect(screen.getByLabelText('Senha')).toHaveAttribute('type', 'password')
   })
 
+  it('ao sair da tela, o listener de visibilidade é removido (não sobra um por revelação)', () => {
+    const removed = vi.spyOn(document, 'removeEventListener')
+    const { unmount } = render(<SecretValue label="Senha" value="segredo" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }))
+
+    unmount()
+
+    expect(removed).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+  })
+
   it('uma mudança de visibilidade para VISÍVEL não oculta a senha', () => {
     render(<SecretValue label="Senha" value="segredo" />)
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }))
@@ -179,6 +189,22 @@ describe('copiar para a área de transferência', () => {
     expect(clipboard.content).toBe(PASSWORD)
 
     act(() => useSessionStore.getState().signOut())
+
+    await waitFor(() => expect(clipboard.content).toBe(''))
+  })
+
+  it('trocar de conta também limpa o clipboard pendente (o segredo é da conta anterior)', async () => {
+    const clipboard = installClipboard()
+    renderVault({ [`GET /vault/entries/${ID}`]: detailHandler(ENTRY) }, `/vault/${ID}`)
+    await userEvent.click(await screen.findByRole('button', { name: 'Copiar senha' }))
+    expect(clipboard.content).toBe(PASSWORD)
+
+    act(() => {
+      useSessionStore
+        .getState()
+        .signIn('jwt-da-bia', new Date(Date.now() + 3_600_000).toISOString())
+      useSessionStore.getState().setUser(OTHER)
+    })
 
     await waitFor(() => expect(clipboard.content).toBe(''))
   })

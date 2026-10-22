@@ -38,7 +38,7 @@ export function VaultListPage() {
 
       {entries.isPending ? (
         <VaultLoading />
-      ) : entries.isError ? (
+      ) : !entries.data ? (
         <VaultLoadError onRetry={() => void entries.refetch()} />
       ) : entries.data.length === 0 ? (
         <Card className="flex flex-col gap-2">

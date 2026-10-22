@@ -31,7 +31,7 @@ function EditEntry({ id }: { id: string }) {
     return entry.error instanceof VaultError && entry.error.failure === 'notFound' ? (
       <EntryNotFound />
     ) : (
-      <VaultLoadError onRetry={() => void entry.refetch()} />
+      <VaultLoadError heading onRetry={() => void entry.refetch()} />
     )
   }
 

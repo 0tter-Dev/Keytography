@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import { ConfirmPermanentDeleteDialog } from './ConfirmPermanentDeleteDialog'
 import { VaultError, type EntryListItem } from './vault-api'
-import { isUnexplainedUnauthorized } from './vault-feedback'
+import {
+  captureSessionContext,
+  isUnexplainedUnauthorized,
+  type SessionContext,
+} from './vault-feedback'
 import { VaultLoadError } from './VaultLoadError'
 import { VaultLoading } from './VaultLoading'
 import { usePermanentlyDeleteEntry, useRestoreEntry, useTrash } from './vault-queries'
@@ -27,8 +31,8 @@ export function TrashPage() {
    * Um `unauthorized` que o cliente já explica (sessão encerrada, conta trocada) não ganha toast;
    * o que ele não explica (conta ainda por conferir) diz que nada foi feito.
    */
-  function reportFailure(error: unknown, message: string) {
-    if (isUnexplainedUnauthorized(error)) {
+  function reportFailure(error: unknown, startedIn: SessionContext, message: string) {
+    if (isUnexplainedUnauthorized(error, startedIn)) {
       toast.warning(t('vault.errors.unauthorized'))
     } else if (!(error instanceof VaultError && error.failure === 'unauthorized')) {
       toast.error(message)
@@ -39,11 +43,12 @@ export function TrashPage() {
     if (restore.isPending) {
       return
     }
+    const startedIn = captureSessionContext()
     try {
       await restore.mutateAsync(entry.id)
       toast.success(t('vault.trash.restored'))
     } catch (error) {
-      reportFailure(error, t('vault.trash.restoreFailed'))
+      reportFailure(error, startedIn, t('vault.trash.restoreFailed'))
     }
   }
 
@@ -51,11 +56,12 @@ export function TrashPage() {
     if (!target || permanentDelete.isPending) {
       return
     }
+    const startedIn = captureSessionContext()
     try {
       await permanentDelete.mutateAsync(target.id)
       toast.success(t('vault.trash.deleted'))
     } catch (error) {
-      reportFailure(error, t('vault.trash.deleteFailed'))
+      reportFailure(error, startedIn, t('vault.trash.deleteFailed'))
     } finally {
       setTarget(null)
     }
@@ -78,7 +84,7 @@ export function TrashPage() {
 
       {trash.isPending ? (
         <VaultLoading />
-      ) : trash.isError ? (
+      ) : !trash.data ? (
         <VaultLoadError onRetry={() => void trash.refetch()} />
       ) : trash.data.length === 0 ? (
         <Card className="flex flex-col gap-2">
