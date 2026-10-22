@@ -119,11 +119,13 @@ A sessão é gerenciada pela API ([ADR-0006](../decisions/ADR-0006-backend-manag
 Regras para qualquer tela que exiba ou manipule uma senha (decisão no [ADR-0007](../decisions/ADR-0007-web-client-secret-handling.md)):
 
 - **Só na memória da aba:** a senha nunca vai para `localStorage`, `sessionStorage`, URL, título da página nem `console.*`; rascunhos de formulário não são persistidos.
-- **Consultas que trazem senha usam `gcTime: 0`** e são buscadas na hora (`useEntry`/`useHistory` em `features/vault/vault-queries.ts`); a camada de acesso (`vault-api.ts`) devolve das mutações **só o `id`**, e as mutações usam `gcTime: 0`. Nunca grave um detalhe com senha no cache (`setQueryData`).
+- **Consultas que trazem senha usam `gcTime: 0`** e são buscadas na hora (`useEntry`/`useEntryForEdit`/`useHistory` em `features/vault/vault-queries.ts`; a edição tem chave própria, para não herdar o cache do detalhe); a camada de acesso (`vault-api.ts`) devolve das mutações **só o `id`**, e as mutações usam `gcTime: 0`. Nunca grave um detalhe com senha no cache (`setQueryData`).
 - **Mostrar um segredo** com `SecretValue` (oculto por padrão; `useReveal` oculta sozinho em 30 s, ao ocultar a aba e ao sair da tela) e **copiar** com `CopyButton`, que usa `lib/secret-clipboard.ts` (limpeza em 20 s; limpa na hora no logout). Não chame `navigator.clipboard` direto para segredos.
 - **Campos de senha de dados do cofre** usam `autoComplete="new-password"` (`PasswordInput`) e os demais `autoComplete="off"`: a senha de uma entrada não é credencial do Keytography.
 - **Valores do usuário como texto:** nada de `dangerouslySetInnerHTML` nem link automático.
-- **Ação irreversível** pede confirmação digitada (`ConfirmPermanentDeleteDialog` sobre o primitivo `ui/dialog`), e o botão de qualquer mutação fica desabilitado enquanto ela voa.
+- **Ação irreversível** pede confirmação digitada (`ConfirmPermanentDeleteDialog` sobre o primitivo `ui/dialog`); ação reversível que tira algo da vista pede confirmação direta (`ConfirmMoveToTrashDialog`); o botão de qualquer mutação fica desabilitado enquanto ela voa.
+- **Um refetch que falha não apaga o que já está na tela:** trate erro de carregamento só quando NÃO há dado (`!query.data`), nunca por `isError` sozinho.
+- Um `401` do cofre que o cliente de sessão não explica (conta ainda por conferir, refresh sem resposta) avisa que nada foi feito (`features/vault/vault-feedback.ts`); se a sessão terminou ou a conta trocou, valem os avisos do cliente.
 - Os testes das telas do cofre usam `features/vault/vault-test-support.ts` (`renderVault`, entradas de exemplo) sobre `renderRoutes` e `stubApi`; cada invariante é provada observando o teste falhar sem o comportamento.
 
 ## Testes

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
-import { Card, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { EntryForm } from './EntryForm'
 import { useEntrySubmit } from './use-entry-submit'
 import { useCreateEntry } from './vault-queries'
@@ -15,7 +15,7 @@ export function NewEntryPage() {
 
   return (
     <Card className="flex max-w-xl flex-col gap-4">
-      <CardTitle>{t('vault.form.newTitle')}</CardTitle>
+      <h1 className="text-lg font-semibold tracking-tight">{t('vault.form.newTitle')}</h1>
       <EntryForm
         mode="create"
         defaultValues={EMPTY}

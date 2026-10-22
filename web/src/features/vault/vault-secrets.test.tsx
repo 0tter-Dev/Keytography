@@ -88,6 +88,15 @@ describe('revelar uma senha é temporário', () => {
     expect(screen.getByLabelText('Senha')).toHaveAttribute('type', 'password')
   })
 
+  it('uma mudança de visibilidade para VISÍVEL não oculta a senha', () => {
+    render(<SecretValue label="Senha" value="segredo" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }))
+
+    act(() => setTabHidden(false))
+
+    expect(screen.getByLabelText('Senha')).toHaveAttribute('type', 'text')
+  })
+
   it('revelar de novo reinicia o prazo', () => {
     render(<SecretValue label="Senha" value="segredo" />)
     const field = screen.getByLabelText('Senha')
@@ -147,7 +156,7 @@ describe('copiar para a área de transferência', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copiar senha' }))
     expect(clipboard.content).toBe(PASSWORD)
-    expect(await screen.findByText(/será limpa em 20 segundos/)).toBeInTheDocument()
+    expect(await screen.findByText(/será limpa em cerca de 20 segundos/)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Copiar login' }))
     expect(clipboard.content).toBe('ana@banco')
@@ -377,6 +386,7 @@ describe('sessão e conta mudando com segredos na tela', () => {
 
     expect(await screen.findByText(ptBR.health.title)).toBeInTheDocument()
     expect(document.body.innerHTML).not.toContain(PASSWORD)
+    expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument() // o aviso é o da troca de conta
     // Nenhuma chamada do cofre saiu com o token antigo, e nenhuma escrita saiu: a recarga depois da
     // troca de conta é feita como a conta nova.
     const vaultCalls = stub.calls.filter((call) => call.path.startsWith('/vault/'))

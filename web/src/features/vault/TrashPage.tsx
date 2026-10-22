@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import { ConfirmPermanentDeleteDialog } from './ConfirmPermanentDeleteDialog'
 import { VaultError, type EntryListItem } from './vault-api'
+import { isUnexplainedUnauthorized } from './vault-feedback'
 import { VaultLoadError } from './VaultLoadError'
 import { VaultLoading } from './VaultLoading'
 import { usePermanentlyDeleteEntry, useRestoreEntry, useTrash } from './vault-queries'
@@ -22,9 +23,14 @@ export function TrashPage() {
   const permanentDelete = usePermanentlyDeleteEntry()
   const [target, setTarget] = useState<EntryListItem | null>(null)
 
-  /** `unauthorized`: a sessão terminou ou a conta trocou; o cliente já leva ao login ou avisa. */
+  /**
+   * Um `unauthorized` que o cliente já explica (sessão encerrada, conta trocada) não ganha toast;
+   * o que ele não explica (conta ainda por conferir) diz que nada foi feito.
+   */
   function reportFailure(error: unknown, message: string) {
-    if (!(error instanceof VaultError && error.failure === 'unauthorized')) {
+    if (isUnexplainedUnauthorized(error)) {
+      toast.warning(t('vault.errors.unauthorized'))
+    } else if (!(error instanceof VaultError && error.failure === 'unauthorized')) {
       toast.error(message)
     }
   }
@@ -96,6 +102,7 @@ export function TrashPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={restore.isPending}
                   aria-label={`${t('vault.trash.restore')}: ${entry.title}`}
                   onClick={() => restoreEntry(entry)}
                 >

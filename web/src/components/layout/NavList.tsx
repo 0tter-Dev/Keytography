@@ -39,7 +39,6 @@ export function NavList({ collapsed = false, onNavigate }: NavListProps) {
               {to ? (
                 <NavLink
                   to={to}
-                  end
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(

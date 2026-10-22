@@ -30,7 +30,11 @@ export function EntryHistory({ id }: { id: string }) {
           <p className="text-sm text-muted-foreground">
             {t('vault.history.changedAt', { date: formatDateTime(item.changedAt) })}
           </p>
-          <SecretValue label={t('vault.form.fields.password')} value={item.password} />
+          <SecretValue
+            label={t('vault.form.fields.password')}
+            value={item.password}
+            context={t('vault.history.itemContext', { date: formatDateTime(item.changedAt) })}
+          />
         </li>
       ))}
     </ul>

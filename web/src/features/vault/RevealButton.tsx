@@ -18,7 +18,6 @@ export function RevealButton({ label, revealed, onToggle }: RevealButtonProps) {
       type="button"
       variant="outline"
       size="icon"
-      aria-pressed={revealed}
       aria-label={revealed ? t('vault.secret.hide', { label }) : t('vault.secret.show', { label })}
       onClick={onToggle}
     >

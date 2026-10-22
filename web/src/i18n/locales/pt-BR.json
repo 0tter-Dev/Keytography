@@ -193,7 +193,14 @@
       "createdAt": "Criada em {{date}}",
       "updatedAt": "Atualizada em {{date}}",
       "additionalFields": "Campos adicionais",
-      "back": "Voltar ao cofre"
+      "back": "Voltar ao cofre",
+      "confirmTrash": {
+        "title": "Mover para a lixeira?",
+        "description": "A entrada sai da lista, mas continua na lixeira, de onde pode ser restaurada.",
+        "confirm": "Mover para a lixeira",
+        "cancel": "Cancelar",
+        "moving": "Movendo…"
+      }
     },
     "secret": {
       "show": "Mostrar {{label}}",
@@ -201,14 +208,14 @@
     },
     "copy": {
       "label": "Copiar {{what}}",
-      "done": "Copiado. A área de transferência será limpa em {{seconds}} segundos.",
+      "done": "Copiado. A área de transferência será limpa em cerca de {{seconds}} segundos.",
       "unavailable": "A área de transferência não está disponível neste navegador ou neste endereço."
     },
     "history": {
-      "title": "Histórico de senhas",
       "empty": "A senha desta entrada nunca foi trocada.",
       "changedAt": "Trocada em {{date}}",
-      "loadError": "Não foi possível carregar o histórico."
+      "loadError": "Não foi possível carregar o histórico.",
+      "itemContext": "trocada em {{date}}"
     },
     "trash": {
       "title": "Lixeira",
@@ -233,6 +240,9 @@
       "cancel": "Cancelar",
       "confirm": "Excluir definitivamente",
       "deleting": "Excluindo…"
+    },
+    "errors": {
+      "unauthorized": "Não foi possível confirmar a sua sessão agora e nada foi feito. Tente de novo em instantes."
     }
   }
 }

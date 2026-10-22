@@ -343,9 +343,52 @@ describe('detalhe da entrada', () => {
     )
     await userEvent.click(await screen.findByRole('link', { name: /Banco/ }))
     await userEvent.click(await screen.findByRole('button', { name: vault.detail.delete }))
+    const dialog = await screen.findByRole('dialog')
+    expect(callsTo(calls, 'DELETE', `/vault/entries/${ID}`)).toHaveLength(0) // nada antes de confirmar
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: vault.detail.confirmTrash.confirm }),
+    )
 
     expect(await screen.findByText(vault.list.empty.title)).toBeInTheDocument()
     expect(callsTo(calls, 'DELETE', `/vault/entries/${ID}`)).toHaveLength(1)
+  })
+
+  it('cancelar a confirmação NÃO move a entrada para a lixeira', async () => {
+    const { calls } = renderVault(
+      {
+        [`GET /vault/entries/${ID}`]: detailHandler(ENTRY),
+        [`DELETE /vault/entries/${ID}`]: { status: 204 },
+      },
+      `/vault/${ID}`,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: vault.detail.delete }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: vault.detail.confirmTrash.cancel }),
+    )
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(callsTo(calls, 'DELETE', `/vault/entries/${ID}`)).toHaveLength(0)
+    expect(screen.getByRole('heading', { name: 'Banco' })).toBeInTheDocument()
+  })
+
+  it('mover para a lixeira algo que já não existe (404) conta como feito', async () => {
+    renderVault(
+      {
+        'GET /vault/entries': { body: [] },
+        [`GET /vault/entries/${ID}`]: detailHandler(ENTRY),
+        [`DELETE /vault/entries/${ID}`]: { status: 404 },
+      },
+      `/vault/${ID}`,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: vault.detail.delete }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: vault.detail.confirmTrash.confirm }),
+    )
+
+    expect(await screen.findByText(vault.list.empty.title)).toBeInTheDocument()
+    expect(screen.queryByText(vault.detail.deleteFailed)).not.toBeInTheDocument()
   })
 
   it('duplo clique em "mover para a lixeira" envia UMA requisição', async () => {
@@ -364,9 +407,12 @@ describe('detalhe da entrada', () => {
       },
       `/vault/${ID}`,
     )
-    const button = await screen.findByRole('button', { name: vault.detail.delete })
+    await userEvent.click(await screen.findByRole('button', { name: vault.detail.delete }))
+    const dialog = await screen.findByRole('dialog')
 
-    await userEvent.dblClick(button)
+    await userEvent.dblClick(
+      within(dialog).getByRole('button', { name: vault.detail.confirmTrash.confirm }),
+    )
     finish()
 
     await screen.findByText(vault.list.empty.title)
@@ -422,7 +468,10 @@ describe('histórico de senhas', () => {
     expect(passwords.every((field) => field.getAttribute('type') === 'password')).toBe(true)
     expect(passwords[1]).toHaveValue('senha-antiga-2')
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'Mostrar senha' })[1]!)
+    // Os botões do histórico dizem de qual troca são (nomes distintos).
+    const showButtons = screen.getAllByRole('button', { name: /Mostrar senha \(trocada em/ })
+    expect(new Set(showButtons.map((button) => button.getAttribute('aria-label'))).size).toBe(2)
+    await userEvent.click(showButtons[0]!)
     expect(passwords[1]).toHaveAttribute('type', 'text')
     expect(passwords[2]).toHaveAttribute('type', 'password') // revelar uma não revela as outras
   })

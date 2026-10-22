@@ -46,13 +46,15 @@ export function EntryForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
-      {failure && failure !== 'validation' && (
+      {failure && !(failure === 'validation' && titleServerError) && (
         <Alert variant="destructive">
           {failure === 'network'
             ? t('vault.form.errors.network')
             : failure === 'notFound'
               ? t('vault.form.errors.notFound')
-              : t('vault.form.errors.unknown')}
+              : failure === 'unauthorized'
+                ? t('vault.errors.unauthorized')
+                : t('vault.form.errors.unknown')}
         </Alert>
       )}
 

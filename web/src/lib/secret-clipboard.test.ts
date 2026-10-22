@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CLIPBOARD_CLEAR_MS,
+  READ_TIMEOUT_MS,
   clearPendingClipboard,
   copySecret,
   isClipboardAvailable,
@@ -210,6 +211,78 @@ describe('limpar na hora (logout, expiração da sessão)', () => {
     setFocus(true)
     window.dispatchEvent(new Event('focus'))
     await advance(0)
+    expect(clipboard.content).toBe('')
+  })
+})
+
+describe('leitura do clipboard que não responde', () => {
+  it('o tempo de espera pela leitura é de 2 segundos', () => {
+    expect(READ_TIMEOUT_MS).toBe(2_000)
+  })
+
+  it('leitura pendente (prompt de permissão) é tratada como negada: limpa 2 s depois do prazo', async () => {
+    const clipboard = installClipboard()
+    await copySecret('segredo')
+    clipboard.readText?.mockImplementation(() => new Promise<string>(() => undefined)) // nunca resolve
+
+    await advance(21_999)
+    expect(clipboard.content).toBe('segredo') // ainda esperando a leitura
+    await advance(2)
+
+    expect(clipboard.content).toBe('')
+  })
+
+  it('o logout com a leitura pendente também termina (limpa depois do tempo de espera)', async () => {
+    const clipboard = installClipboard()
+    await copySecret('segredo')
+    clipboard.readText?.mockImplementation(() => new Promise<string>(() => undefined))
+
+    const clearing = clearPendingClipboard()
+    await advance(2_001)
+    await clearing
+
+    expect(clipboard.content).toBe('')
+  })
+})
+
+describe('cópia em andamento durante o logout ou outra cópia', () => {
+  it('uma cópia que ainda estava sendo escrita quando a sessão terminou é apagada assim que a escrita termina', async () => {
+    const clipboard = installClipboard()
+    let finishWrite: () => void = () => {}
+    clipboard.writeText.mockImplementationOnce(async (text: string) => {
+      await new Promise<void>((resolve) => {
+        finishWrite = resolve
+      })
+      clipboard.content = text
+    })
+
+    const copying = copySecret('segredo')
+    await clearPendingClipboard() // o logout acontece enquanto a escrita está em voo
+    finishWrite()
+
+    expect(await copying).toBe('unavailable')
+    expect(clipboard.content).toBe('') // o segredo não ficou no clipboard
+    await advance(60_000)
+    expect(clipboard.content).toBe('')
+  })
+
+  it('duas cópias seguidas: só a mais nova agenda a limpeza (a que termina depois não a adia)', async () => {
+    const clipboard = installClipboard()
+    let finishFirst: () => void = () => {}
+    clipboard.writeText.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => {
+        finishFirst = resolve
+      })
+    })
+
+    const first = copySecret('primeiro') // escrita lenta
+    clipboard.content = ''
+    await copySecret('segundo') // escrita rápida; o prazo conta daqui
+    await advance(10_000)
+    finishFirst()
+    await first
+
+    await advance(10_001) // 20 s desde a cópia mais nova
     expect(clipboard.content).toBe('')
   })
 })

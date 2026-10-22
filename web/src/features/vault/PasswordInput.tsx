@@ -16,7 +16,13 @@ export function PasswordInput(props: Omit<ComponentProps<typeof Input>, 'type' |
 
   return (
     <div className="flex items-center gap-2">
-      <Input {...props} type={revealed ? 'text' : 'password'} autoComplete="new-password" />
+      <Input
+        {...props}
+        type={revealed ? 'text' : 'password'}
+        autoComplete="new-password"
+        spellCheck={false}
+        autoCapitalize="off"
+      />
       <RevealButton
         label={t('vault.form.fields.password').toLowerCase()}
         revealed={revealed}

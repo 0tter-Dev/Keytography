@@ -20,6 +20,8 @@ export const vaultKeys = {
   entries: ['vault', 'entries'] as const,
   trash: ['vault', 'trash'] as const,
   entry: (id: string) => ['vault', 'entry', id] as const,
+  /** Detalhe para EDIÇÃO: chave própria, para nunca herdar o dado em cache do detalhe. */
+  editEntry: (id: string) => ['vault', 'entry', id, 'edit'] as const,
   history: (id: string) => ['vault', 'history', id] as const,
 }
 
@@ -31,13 +33,29 @@ export function useTrash() {
   return useQuery({ queryKey: vaultKeys.trash, queryFn: listTrash })
 }
 
-/** Detalhe com a senha: `gcTime: 0` e sempre fresco (a edição nunca abre com dado velho). */
+/** Detalhe com a senha: `gcTime: 0` e sempre buscado na hora. */
 export function useEntry(id: string) {
   return useQuery({
     queryKey: vaultKeys.entry(id),
     queryFn: () => getEntry(id),
     gcTime: 0,
     staleTime: 0,
+  })
+}
+
+/**
+ * Detalhe para editar: chave própria (não compartilha cache com o detalhe, que sobreviveria à troca
+ * de rota e faria o formulário nascer com dado velho), sempre buscado na hora e sem refetch de
+ * segundo plano (o formulário já tem o que a pessoa digitou).
+ */
+export function useEntryForEdit(id: string) {
+  return useQuery({
+    queryKey: vaultKeys.editEntry(id),
+    queryFn: () => getEntry(id),
+    gcTime: 0,
+    staleTime: 0,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -53,8 +71,9 @@ export function useHistory(id: string, enabled: boolean) {
 }
 
 /**
- * Depois de qualquer mudança, recarrega as listas. Detalhe e histórico (com senha) não precisam ser
- * descartados aqui: com `gcTime: 0` já saem da memória quando a tela é deixada.
+ * Depois de qualquer mudança, recarrega as listas. Detalhe, edição e histórico (com senha) não
+ * precisam ser descartados aqui: com `gcTime: 0` e chaves distintas, nenhum deles sobrevive à troca
+ * de tela, então o detalhe nunca mostra o dado de antes de salvar.
  */
 async function refreshAfterChange(queryClient: QueryClient) {
   await Promise.all([

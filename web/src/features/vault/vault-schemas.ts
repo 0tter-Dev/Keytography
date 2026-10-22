@@ -31,7 +31,7 @@ export function entrySchema(t: TFunction) {
     .superRefine((values, context) => {
       const seen = new Set<string>()
       values.fields.forEach((field, index) => {
-        const name = field.name.trim()
+        const name = field.name // já aparado pelo schema de cada campo
         if (name !== '' && seen.has(name)) {
           context.addIssue({
             code: 'custom',

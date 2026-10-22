@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Card, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { formatDateTime } from '@/lib/format-date'
+import { ConfirmMoveToTrashDialog } from './ConfirmMoveToTrashDialog'
 import { CopyButton } from './CopyButton'
 import { EntryHistory } from './EntryHistory'
 import { EntryNotFound } from './EntryNotFound'
 import { SecretValue } from './SecretValue'
+import { isUnexplainedUnauthorized } from './vault-feedback'
 import { VaultError } from './vault-api'
 import { VaultLoadError } from './VaultLoadError'
 import { VaultLoading } from './VaultLoading'
@@ -27,11 +29,13 @@ function EntryDetail({ id }: { id: string }) {
   const entry = useEntry(id)
   const softDelete = useSoftDeleteEntry()
   const [showHistory, setShowHistory] = useState(false)
+  const [confirmingTrash, setConfirmingTrash] = useState(false)
 
   if (entry.isPending) {
     return <VaultLoading rows={4} />
   }
-  if (entry.isError) {
+  // Só é erro de carregamento se NÃO há dado: um refetch que falha com o detalhe na tela não o apaga.
+  if (!entry.data) {
     return entry.error instanceof VaultError && entry.error.failure === 'notFound' ? (
       <EntryNotFound />
     ) : (
@@ -51,8 +55,11 @@ function EntryDetail({ id }: { id: string }) {
       toast.success(t('vault.detail.deleted'))
       navigate('/vault')
     } catch (error) {
-      // `unauthorized`: a sessão terminou ou a conta trocou; o cliente já leva ao login ou avisa.
-      if (!(error instanceof VaultError && error.failure === 'unauthorized')) {
+      setConfirmingTrash(false)
+      // Um `unauthorized` que o cliente já explica (sessão encerrada, conta trocada) não ganha toast.
+      if (isUnexplainedUnauthorized(error)) {
+        toast.warning(t('vault.errors.unauthorized'))
+      } else if (!(error instanceof VaultError && error.failure === 'unauthorized')) {
         toast.error(t('vault.detail.deleteFailed'))
       }
     }
@@ -61,7 +68,7 @@ function EntryDetail({ id }: { id: string }) {
   return (
     <Card className="flex max-w-xl flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <CardTitle>{title}</CardTitle>
+        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
             <Link to={`/vault/${id}/edit`}>
@@ -69,7 +76,7 @@ function EntryDetail({ id }: { id: string }) {
               {t('vault.detail.edit')}
             </Link>
           </Button>
-          <Button variant="outline" size="sm" disabled={softDelete.isPending} onClick={moveToTrash}>
+          <Button variant="outline" size="sm" onClick={() => setConfirmingTrash(true)}>
             <Trash2 aria-hidden="true" />
             {t('vault.detail.delete')}
           </Button>
@@ -90,7 +97,7 @@ function EntryDetail({ id }: { id: string }) {
 
       {fieldRows.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium">{t('vault.detail.additionalFields')}</h3>
+          <h2 className="text-sm font-medium">{t('vault.detail.additionalFields')}</h2>
           <dl className="flex flex-col gap-1 text-sm">
             {fieldRows.map(([name, value]) => (
               <div key={name} className="flex gap-2">
@@ -123,6 +130,13 @@ function EntryDetail({ id }: { id: string }) {
       <Button asChild variant="ghost" size="sm" className="self-start">
         <Link to="/vault">{t('vault.detail.back')}</Link>
       </Button>
+
+      <ConfirmMoveToTrashDialog
+        open={confirmingTrash}
+        pending={softDelete.isPending}
+        onOpenChange={setConfirmingTrash}
+        onConfirm={() => void moveToTrash()}
+      />
     </Card>
   )
 }

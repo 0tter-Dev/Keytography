@@ -112,8 +112,11 @@ export async function updateEntry(id: string, body: EntryInput): Promise<{ id: s
   return { id: detail.id }
 }
 
+/** 404 (a entrada já não existe: excluída de vez em outra aba) conta como feito. */
 export async function softDeleteEntry(id: string): Promise<void> {
-  await execute(() => api.DELETE('/vault/entries/{id}', { params: { path: { id } } }))
+  await execute(() => api.DELETE('/vault/entries/{id}', { params: { path: { id } } }), {
+    notFoundIsOk: true,
+  })
 }
 
 /** 404 (já restaurada ou excluída em outra aba) conta como feito. */
