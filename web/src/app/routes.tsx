@@ -8,6 +8,11 @@ import { RegisterPage } from '@/features/auth/RegisterPage'
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 import { VerifyEmailPage } from '@/features/auth/VerifyEmailPage'
 import { HealthPage } from '@/features/health/HealthPage'
+import { EditEntryPage } from '@/features/vault/EditEntryPage'
+import { EntryDetailPage } from '@/features/vault/EntryDetailPage'
+import { NewEntryPage } from '@/features/vault/NewEntryPage'
+import { TrashPage } from '@/features/vault/TrashPage'
+import { VaultListPage } from '@/features/vault/VaultListPage'
 
 /** Árvore de rotas; separada do roteador para os testes poderem renderizá-la em memória. */
 export const routes: RouteObject[] = [
@@ -34,7 +39,14 @@ export const routes: RouteObject[] = [
       {
         path: '/',
         element: <AppShell />,
-        children: [{ index: true, element: <HealthPage /> }],
+        children: [
+          { index: true, element: <HealthPage /> },
+          { path: 'vault', element: <VaultListPage /> },
+          { path: 'vault/new', element: <NewEntryPage /> },
+          { path: 'vault/trash', element: <TrashPage /> },
+          { path: 'vault/:id', element: <EntryDetailPage /> },
+          { path: 'vault/:id/edit', element: <EditEntryPage /> },
+        ],
       },
     ],
   },

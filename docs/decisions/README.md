@@ -10,3 +10,4 @@ ADRs preservam decisões duráveis que afetam mais de uma capability. Não são 
 - [ADR-0004: Contrato OpenAPI versionado como fonte dos clientes, com guarda contra drift](./ADR-0004-versioned-openapi-contract.md)
 - [ADR-0005: Modelo de sessão do cliente web e direção para sessões gerenciadas pelo backend](./ADR-0005-client-session-model-and-backend-managed-sessions.md) — **substituído pelo ADR-0006**
 - [ADR-0006: Sessões gerenciadas pelo backend, com refresh em cookie `HttpOnly` e DEK atrelada à sessão](./ADR-0006-backend-managed-sessions.md)
+- [ADR-0007: Tratamento de segredos no cliente web](./ADR-0007-web-client-secret-handling.md)

@@ -12,7 +12,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', icon: Home, to: '/' },
-  { key: 'vault', icon: Vault },
+  { key: 'vault', icon: Vault, to: '/vault' },
   { key: 'settings', icon: Settings },
 ]
 
@@ -39,7 +39,6 @@ export function NavList({ collapsed = false, onNavigate }: NavListProps) {
               {to ? (
                 <NavLink
                   to={to}
-                  end
                   onClick={onNavigate}
                   className={({ isActive }) =>
                     cn(

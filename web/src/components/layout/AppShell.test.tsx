@@ -42,8 +42,18 @@ describe('AppShell', () => {
   it('marca os itens sem tela ainda como placeholders desabilitados (não são links)', () => {
     renderShell()
 
-    expect(screen.queryByRole('link', { name: ptBR.nav.vault })).not.toBeInTheDocument()
-    expect(screen.getByText(ptBR.nav.vault).closest('[aria-disabled="true"]')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: ptBR.nav.settings })).not.toBeInTheDocument()
+    expect(screen.getByText(ptBR.nav.settings).closest('[aria-disabled="true"]')).not.toBeNull()
+  })
+
+  it('o item Cofre é um link para /vault', () => {
+    renderShell()
+
+    const nav = screen.getByRole('navigation', { name: ptBR.nav.label })
+    expect(within(nav).getByRole('link', { name: ptBR.nav.vault })).toHaveAttribute(
+      'href',
+      '/vault',
+    )
   })
 
   it('recolhe e expande a sidebar', async () => {

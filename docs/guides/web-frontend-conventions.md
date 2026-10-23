@@ -24,11 +24,11 @@ Não instalamos biblioteca "para o futuro". Cada uma entra no plano cujo código
 api/          cliente tipado (openapi-fetch) e schema.d.ts GERADO — nunca editar à mão
 app/          providers globais e roteador
 components/
-  ui/         primitivos reutilizáveis (Button, Badge, Card, Sheet...) — agnósticos de domínio
+  ui/         primitivos reutilizáveis (Button, Badge, Card, Sheet, Dialog, Skeleton...) — agnósticos de domínio
   layout/     casca da aplicação (AppShell, navegação, marca)
-features/     uma pasta por área funcional (health/, theme/, ... auth/, vault/ nos próximos planos)
+features/     uma pasta por área funcional (health/, theme/, auth/, vault/, ...)
 i18n/         configuração e arquivos de tradução (locales/pt-BR.json)
-lib/          utilitários puros (cn, ...)
+lib/          utilitários (cn, formatação de data, clipboard de segredos...)
 styles/       index.css — Tailwind + tokens de design
 test/         setup global dos testes
 ```
@@ -113,6 +113,20 @@ A sessão é gerenciada pela API ([ADR-0006](../decisions/ADR-0006-backend-manag
 - Chamadas à API usam sempre o cliente tipado (`api/client.ts`): ele anexa o `Authorization`, renova o token se estiver para vencer e, ao receber 401, renova a sessão e **repete a chamada uma vez**; um 401 que persiste encerra a sessão (sem laço). Não monte o cabeçalho à mão, e não trate 401 nas telas. Endpoints anônimos (e o refresh) ficam na lista `PUBLIC_PATHS`; um endpoint anônimo novo entra nela. As chamadas que usam o cookie de refresh (`login`, `refresh`, `logout`) passam `credentials: 'include'` (web e API são origens diferentes).
 - O usuário da sessão vem de `useCurrentUser()` (carregado sob demanda do store, e conferido a cada renovação). Consultas ao TanStack Query **não** incluem o token na chave: o `SessionController` esvazia o cache quando a sessão termina ou a **conta muda**, e só então — renovar o token da mesma conta não limpa nada.
 - Depois do login, `loginRedirectTarget` (`features/auth/redirect.ts`) devolve o destino guardado pelo `RequireAuth`, só se for um caminho interno.
+
+## Segredos e dados sensíveis
+
+Regras para qualquer tela que exiba ou manipule uma senha (decisão no [ADR-0007](../decisions/ADR-0007-web-client-secret-handling.md)):
+
+- **Só na memória da aba:** a senha nunca vai para `localStorage`, `sessionStorage`, URL, título da página nem `console.*`; rascunhos de formulário não são persistidos.
+- **Consultas que trazem senha usam `gcTime: 0`** e são buscadas na hora (`useEntry`/`useEntryForEdit`/`useHistory` em `features/vault/vault-queries.ts`; a edição tem chave própria, para não herdar o cache do detalhe); a camada de acesso (`vault-api.ts`) devolve das mutações **só o `id`**, e as mutações usam `gcTime: 0`. Nunca grave um detalhe com senha no cache (`setQueryData`).
+- **Mostrar um segredo** com `SecretValue` (oculto por padrão; `useReveal` oculta sozinho em 30 s, ao ocultar a aba e ao sair da tela) e **copiar** com `CopyButton`, que usa `lib/secret-clipboard.ts` (limpeza em 20 s; limpa no logout, na expiração e na troca de conta, na hora se a janela tem foco). Não chame `navigator.clipboard` direto para segredos.
+- **Campos de senha de dados do cofre** usam `autoComplete="new-password"` (`PasswordInput`) e os demais `autoComplete="off"`: a senha de uma entrada não é credencial do Keytography.
+- **Valores do usuário como texto:** nada de `dangerouslySetInnerHTML` nem link automático.
+- **Ação irreversível** pede confirmação digitada (`ConfirmPermanentDeleteDialog` sobre o primitivo `ui/dialog`); ação reversível que tira algo da vista pede confirmação direta (`ConfirmMoveToTrashDialog`); o botão de qualquer mutação fica desabilitado enquanto ela voa.
+- **Um refetch que falha não apaga o que já está na tela:** trate erro de carregamento só quando NÃO há dado (`!query.data`), nunca por `isError` sozinho.
+- Um `401` do cofre que o cliente de sessão não explica (conta ainda por conferir, refresh sem resposta) avisa que nada foi feito (`features/vault/vault-feedback.ts`); se a sessão terminou ou a conta trocou, valem os avisos do cliente.
+- Os testes das telas do cofre usam `features/vault/vault-test-support.ts` (`renderVault`, entradas de exemplo) sobre `renderRoutes` e `stubApi`; cada invariante é provada observando o teste falhar sem o comportamento.
 
 ## Testes
 

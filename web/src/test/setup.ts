@@ -3,6 +3,7 @@ import { cleanup } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterEach, vi } from 'vitest'
 import { resetClientRuntime } from '@/api/client'
+import { resetSecretClipboard } from '@/lib/secret-clipboard'
 import { resetSessionRuntime } from '@/features/auth/session'
 import { useSessionStore } from '@/features/auth/session-store'
 import '@/i18n'
@@ -17,6 +18,7 @@ afterEach(() => {
   // Chamadas em voo de um teste (ex.: um que falhou no meio) não podem vazar para o seguinte.
   resetSessionRuntime()
   resetClientRuntime()
+  resetSecretClipboard()
   document.documentElement.removeAttribute('data-theme')
   document.documentElement.removeAttribute('data-accent')
 })

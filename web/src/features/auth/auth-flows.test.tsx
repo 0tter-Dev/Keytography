@@ -320,9 +320,12 @@ describe('LoginPage', () => {
     })
     const withVault = [
       ...routes,
-      { element: <RequireAuth />, children: [{ path: '/vault', element: <p>tela do cofre</p> }] },
+      {
+        element: <RequireAuth />,
+        children: [{ path: '/relatorio', element: <p>tela do cofre</p> }],
+      },
     ]
-    renderRoutes(withVault, '/vault?aba=lixeira')
+    renderRoutes(withVault, '/relatorio?aba=lixeira')
     await screen.findByRole('heading', { name: auth.login.title })
 
     await fill(auth.fields.login, 'ana')
