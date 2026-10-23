@@ -1,10 +1,10 @@
 ---
 id: keytography-009
-status: review
+status: completed
 type: feat
 requires_pull_request: true
 expected_version_impact: minor
-actual_version_impact: pending
+actual_version_impact: minor
 priority: medium
 sequence: 9
 depends_on: [keytography-008, keytography-017]
@@ -203,3 +203,13 @@ Testes em `web/src/features/vault/` (`vault-flows.test.tsx`, `vault-secrets.test
 - `docs/reference/` (contrato): constatação deliberada de que não muda — nenhum endpoint ou DTO é alterado.
 
 ## Outcome
+
+Entregue via [PR #34](https://github.com/0tter-Dev/Keytography/pull/34), mergeada em `main` (merge commit `b1e4812`, sem squash) em 2026-10-23, depois da revisão do plano no [PR #33](https://github.com/0tter-Dev/Keytography/pull/33) (Design Gate: `Invariants And Failure Modes` aprovada em 2026-10-21 antes da ativação). Commits da branch: `a38643c` (ativação), `5fd8013` (interface do cofre: lista, detalhe, criar, editar, histórico sob demanda, lixeira com restaurar e exclusão definitiva com palavra digitada, revelar senha com ocultação automática em 30 s, copiar com limpeza do clipboard em cerca de 20 s, ADR-0007), `f49f811` (1ª auditoria), `c3715f1` (2ª auditoria) e `13d3c87` (3ª auditoria).
+
+Auditado três vezes via `project-audit` como gate pré-merge, sempre em subagente de contexto limpo. A 1ª rodada segurou o merge (I1 a I3 e M1: edição que herdava o dado do detalhe, refetch que falha apagando a tela, mover para a lixeira sem confirmação, chamada recusada sem aviso, leitura do clipboard sem tempo limite, entre outros); a 2ª não teve críticos (F1 a F10: erro mostrado com dado presente nas listas, aviso duplicado na troca de conta, ordem de cópias no clipboard, `h1` nas telas de erro, textos e trilha de aprovação); a 3ª não teve críticos nem importantes e recomendou liberar o merge (M1 a M6, tratados no mesmo PR: teste da exclusão definitiva, textos, cópia mais antiga assumindo a limpeza, aviso enganoso de cópia cancelada pelo logout, offline e lista desatualizada registrados em `Known Limitations`). Todos os achados foram corrigidos no mesmo PR com a aprovação do usuário a cada rodada.
+
+Validação final: `npm run lint`, `format:check` e `build` sem avisos novos (só o aviso de tamanho de chunk que já existia); 339/339 testes do `web/` (eram 209 na `main`) em 3 execuções e 1 embaralhada; `dotnet test` 174/174 (inclui a governança documental); CI (`build` e `web`) verde; `docs/reference/openapi.json` e `schema.d.ts` sem diferença (nenhum endpoint alterado). Invariantes provadas por mutação (cerca de 105 mutações em quatro rodadas de correção, todas mortas pelos testes, exceto os equivalentes listados na `Verification Matrix`). Verificação manual em 2026-10-21 contra a API real, pelo roteiro de `docs/guides/running-locally.md` ("Verificando o cofre na interface web"); **não verificados manualmente:** o caminho de sucesso do clipboard e sua limpeza (o painel do navegador usado nega a permissão de escrita) e o comportamento em Firefox e Safari, cobertos só por teste automatizado.
+
+Limitações conhecidas, aceitas e registradas (plano `Known Limitations`, ADR-0007 e capability `web-interface`): (1) apenas a senha é cifrada no backend, e a interface não avisa sobre os outros campos; (2) sem controle de concorrência (a última gravação vence) e exclusão definitiva por lista velha possível; (3) a limpeza do clipboard é melhor esforço (leitura negada pode sobrescrever uma cópia do usuário, sem foco só roda quando a janela volta a ter foco, Firefox e Safari tendem a recusar a escrita, fechar a aba antes deixa o valor, escritas fora de ordem); (4) uma resposta de rede perdida pode duplicar uma entrada criada ou deixar a lista desatualizada; (5) sem conexão as telas ficam no esqueleto, sem erro (nenhum plano do backlog cobre o modo offline); (6) sem busca, filtro nem paginação, e sem limite de tamanho dos campos; (7) a senha revelada fica visível por até 30 s e está no atributo `value` do campo; (8) um link direto abre o detalhe de uma entrada da lixeira.
+
+`actual_version_impact: minor` — coerente com `expected_version_impact`, sem divergência a justificar: capacidade nova do cliente web (CRUD do cofre na interface) sem alteração de API, banco ou contrato.
