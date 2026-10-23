@@ -223,6 +223,7 @@
         "strong": "Forte"
       },
       "criteriaTitle": "Critérios",
+      "criteriaSummary": "Critérios atendidos: {{met}} de {{total}}",
       "passed": "Atende",
       "failed": "Não atende",
       "criterionScore": "nota {{score}}",
