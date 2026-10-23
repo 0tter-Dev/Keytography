@@ -7,7 +7,7 @@
  *   for negada, indisponível ou ficar pendente (prompt de permissão), limpa assim mesmo;
  * - sem foco (a pessoa foi colar em outro aplicativo), o navegador recusa escrever: a limpeza fica
  *   pendente e roda uma vez quando a janela volta a ter foco;
- * - copiar de novo substitui a limpeza pendente; `clearPendingClipboard` (logout, expiração) limpa na
+ * - copiar de novo substitui a limpeza pendente; `clearPendingClipboard` (logout, expiração, troca de conta) limpa na
  *   hora, inclusive uma cópia que ainda estava sendo escrita.
  *
  * É melhor esforço: fechar a aba antes da limpeza deixa o valor no clipboard, e navegadores que
@@ -50,8 +50,11 @@ export function resetSecretClipboard(): void {
   window.removeEventListener('focus', onFocus)
 }
 
-/** Copia `text` e agenda a limpeza; `unavailable` se o navegador não oferece (ou recusa) o clipboard. */
-export async function copySecret(text: string): Promise<'copied' | 'unavailable'> {
+/**
+ * Copia `text` e agenda a limpeza. `unavailable`: o navegador não oferece (ou recusa) o clipboard.
+ * `cancelled`: a sessão terminou ou a conta trocou durante a escrita e o valor foi descartado.
+ */
+export async function copySecret(text: string): Promise<'copied' | 'unavailable' | 'cancelled'> {
   if (!isClipboardAvailable()) {
     return 'unavailable'
   }
@@ -66,10 +69,10 @@ export async function copySecret(text: string): Promise<'copied' | 'unavailable'
   if (generation !== startedIn) {
     // O logout/expiração aconteceu enquanto a cópia era escrita: o segredo não pode ficar.
     await writeEmpty()
-    return 'unavailable'
+    return 'cancelled'
   }
-  if (sequence < scheduledSequence) {
-    return 'copied' // uma cópia mais nova (que terminou antes) já assumiu a limpeza
+  if (pending && sequence < scheduledSequence) {
+    return 'copied' // uma cópia mais nova (que terminou antes) ainda tem a limpeza agendada
   }
   scheduledSequence = sequence
 
@@ -83,7 +86,7 @@ export async function copySecret(text: string): Promise<'copied' | 'unavailable'
   return 'copied'
 }
 
-/** Limpa agora o que foi copiado e ainda não foi limpo (logout, expiração da sessão). */
+/** Limpa agora o que foi copiado e ainda não foi limpo (logout, expiração da sessão, troca de conta). */
 export async function clearPendingClipboard(): Promise<void> {
   generation += 1
   const entry = pending

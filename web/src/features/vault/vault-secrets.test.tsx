@@ -193,6 +193,28 @@ describe('copiar para a área de transferência', () => {
     await waitFor(() => expect(clipboard.content).toBe(''))
   })
 
+  it('uma cópia cancelada pelo logout não avisa "clipboard indisponível" (o aviso seria enganoso)', async () => {
+    const clipboard = installClipboard()
+    let finishWrite: () => void = () => {}
+    clipboard.writeText.mockImplementationOnce(async (text: string) => {
+      await new Promise<void>((resolve) => {
+        finishWrite = resolve
+      })
+      clipboard.content = text
+    })
+    renderVault({ [`GET /vault/entries/${ID}`]: detailHandler(ENTRY) }, `/vault/${ID}`)
+    await userEvent.click(await screen.findByRole('button', { name: 'Copiar senha' }))
+
+    act(() => useSessionStore.getState().signOut()) // a escrita ainda está em voo
+    await act(async () => {
+      finishWrite()
+      await new Promise((resolve) => setTimeout(resolve, 30))
+    })
+
+    expect(clipboard.content).toBe('')
+    expect(screen.queryByText(vault.copy.unavailable)).not.toBeInTheDocument()
+  })
+
   it('trocar de conta também limpa o clipboard pendente (o segredo é da conta anterior)', async () => {
     const clipboard = installClipboard()
     renderVault({ [`GET /vault/entries/${ID}`]: detailHandler(ENTRY) }, `/vault/${ID}`)

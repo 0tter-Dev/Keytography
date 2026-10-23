@@ -18,7 +18,7 @@ export function CopyButton({ what, value }: CopyButtonProps) {
     const result = await copySecret(value)
     if (result === 'copied') {
       toast.success(t('vault.copy.done', { seconds: CLIPBOARD_CLEAR_MS / 1000 }))
-    } else {
+    } else if (result === 'unavailable') {
       toast.warning(t('vault.copy.unavailable'))
     }
   }

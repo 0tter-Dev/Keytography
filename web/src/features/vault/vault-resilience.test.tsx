@@ -360,6 +360,17 @@ describe('validações e mensagens do formulário', () => {
   })
 })
 
+/** Abre o diálogo de exclusão definitiva da linha, digita a palavra de confirmação e confirma. */
+async function confirmPermanentDelete(rowButton: RegExp) {
+  await userEvent.click(await screen.findByRole('button', { name: rowButton }))
+  const dialog = await screen.findByRole('dialog')
+  await userEvent.type(
+    within(dialog).getByLabelText(vault.confirmDelete.label),
+    vault.confirmDelete.word,
+  )
+  await userEvent.click(within(dialog).getByRole('button', { name: vault.confirmDelete.confirm }))
+}
+
 describe('chamada sem resposta do servidor que a sessão não explica', () => {
   it('salvar com a sessão ainda ativa mas sem poder confirmá-la avisa que nada foi feito (e mantém os dados)', async () => {
     const { calls } = renderVault(
@@ -447,6 +458,38 @@ describe('chamada sem resposta do servidor que a sessão não explica', () => {
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument()
     expect(screen.queryByText(vault.detail.deleteFailed)).not.toBeInTheDocument()
+  })
+
+  it('excluir definitivamente na mesma situação avisa com um toast, e a entrada continua na lixeira', async () => {
+    renderVault(
+      {
+        'GET /vault/entries/trash': { body: [listItem(SECOND)] },
+        [`DELETE /vault/entries/${ID2}/permanent`]: { status: 401 },
+        'POST /auth/refresh': { status: 503 },
+      },
+      '/vault/trash',
+    )
+    await confirmPermanentDelete(/Excluir definitivamente: Streaming/)
+
+    expect(await screen.findByText(vault.errors.unauthorized)).toBeInTheDocument()
+    expect(screen.getByText('Streaming')).toBeInTheDocument()
+  })
+
+  it('excluir definitivamente com a sessão encerrada pelo servidor não deixa o toast de "nada foi feito" no login', async () => {
+    renderVault(
+      {
+        'GET /vault/entries/trash': { body: [listItem(SECOND)] },
+        [`DELETE /vault/entries/${ID2}/permanent`]: { status: 401 },
+        'POST /auth/refresh': { status: 401 },
+      },
+      '/vault/trash',
+    )
+    await confirmPermanentDelete(/Excluir definitivamente: Streaming/)
+
+    expect(await screen.findByRole('heading', { name: ptBR.auth.login.title })).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument()
+    expect(screen.queryByText(vault.trash.deleteFailed)).not.toBeInTheDocument()
   })
 
   it('com a sessão encerrada pelo servidor, o aviso é o do login (não o de "nada foi feito")', async () => {
@@ -653,6 +696,32 @@ describe('chamada recusada por troca de conta: só o aviso do cliente de sessão
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument()
     expect(screen.queryByText(vault.trash.restoreFailed)).not.toBeInTheDocument()
+  })
+
+  it('excluir definitivamente também não mostra o aviso de "nada foi feito"', async () => {
+    renderVault(
+      {
+        'GET /vault/entries/trash': { body: [listItem(SECOND)] },
+        [`DELETE /vault/entries/${ID2}/permanent`]: { status: 204 },
+        'GET /auth/me': { body: OTHER },
+      },
+      '/vault/trash',
+    )
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Excluir definitivamente: Streaming/ }),
+    )
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(
+      within(dialog).getByLabelText(vault.confirmDelete.label),
+      vault.confirmDelete.word,
+    )
+    switchAccountUnderneath()
+    await userEvent.click(within(dialog).getByRole('button', { name: vault.confirmDelete.confirm }))
+
+    expect(await screen.findByText(ptBR.auth.accountChanged)).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(screen.queryByText(vault.errors.unauthorized)).not.toBeInTheDocument()
+    expect(screen.queryByText(vault.trash.deleteFailed)).not.toBeInTheDocument()
   })
 
   it('mover para a lixeira também não mostra o aviso de "nada foi feito"', async () => {

@@ -260,7 +260,7 @@ describe('cópia em andamento durante o logout ou outra cópia', () => {
     await clearPendingClipboard() // o logout acontece enquanto a escrita está em voo
     finishWrite()
 
-    expect(await copying).toBe('unavailable')
+    expect(await copying).toBe('cancelled')
     expect(clipboard.content).toBe('') // o segredo não ficou no clipboard
     await advance(60_000)
     expect(clipboard.content).toBe('')
@@ -325,5 +325,26 @@ describe('cópias que se sobrepõem', () => {
 
     await advance(20_001)
     expect(clipboard.content).toBe('') // a primeira foi limpa no prazo
+  })
+
+  it('a cópia mais nova já foi limpa quando a anterior termina: a anterior volta a ter a limpeza agendada', async () => {
+    const clipboard = installClipboard()
+    let finishFirst: () => void = () => {}
+    clipboard.writeText.mockImplementationOnce(async (text: string) => {
+      await new Promise<void>((resolve) => {
+        finishFirst = resolve
+      })
+      clipboard.content = text
+    })
+
+    const first = copySecret('primeiro') // escrita muito lenta
+    await copySecret('segundo')
+    await advance(20_001) // a limpeza da segunda já rodou
+    finishFirst()
+    expect(await first).toBe('copied')
+    expect(clipboard.content).toBe('primeiro')
+
+    await advance(20_001)
+    expect(clipboard.content).toBe('') // a primeira não ficou sem limpeza
   })
 })
