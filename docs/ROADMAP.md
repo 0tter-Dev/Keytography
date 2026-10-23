@@ -10,7 +10,7 @@ Decidido em 2026-10-01/02: React + TypeScript + Vite (ver [PROJECT-ARCHITECTURE.
 
 | Priority | Item | Notes |
 | --- | --- | --- |
-| medium | UI de avaliação de força | [keytography-010](./plans/backlog/keytography-010-web-password-evaluation-ui.md) — depende de keytography-009 |
+| medium | UI de avaliação de força | [keytography-010](./plans/active/keytography-010-web-password-evaluation-ui.md) — depende de keytography-009 |
 | medium | UI de geração de senha | [keytography-011](./plans/backlog/keytography-011-web-password-generation-ui.md) — depende de keytography-009 e keytography-010 |
 | medium | Configurações de conta + troca de senha autenticada | [keytography-012](./plans/backlog/keytography-012-web-account-settings-and-password-change.md) — depende de keytography-009 |
 | medium | UI de supervisão do Admin (mínima) | [keytography-013](./plans/backlog/keytography-013-web-admin-supervision-ui.md) — depende de keytography-008, keytography-009 |

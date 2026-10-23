@@ -1,6 +1,6 @@
 ---
 id: keytography-010
-status: backlog
+status: active
 type: feat
 requires_pull_request: true
 expected_version_impact: patch
@@ -51,6 +51,8 @@ Exibir, na tela de detalhe de uma entrada de cofre, a nota de força e o detalha
 - Geração de senha (`keytography-011`), que reaproveita o componente.
 
 ## Approval
+
+Ativado e aprovado pelo usuário em 2026-10-23, ao pedir explicitamente a ativação e a implementação deste plano (o próximo da fila do `ROADMAP.md`), depois da revisão registrada no PR #36. **A seção `Invariants And Failure Modes` (com `Known Limitations` e `Verification Matrix`) foi revisada contra a API real e aprovada pelo usuário em 2026-10-23 antes da ativação**, com as decisões: nota mostrada só no detalhe (sem pré-visualização nos formulários, sem endpoint novo nem avaliação no frontend), faixas 0–39 fraca, 40–69 média e 70–100 forte sempre com texto, e invariantes de nota nula, critério desconhecido e valor fora da faixa. Este plano não altera API, banco nem contrato (`expected_version_impact: patch`), não toca em criptografia, autenticação nem controle de acesso, e a única capability autorizada é `web-interface`.
 
 ## Acceptance Criteria
 
