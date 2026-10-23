@@ -10,6 +10,7 @@ import { ConfirmMoveToTrashDialog } from './ConfirmMoveToTrashDialog'
 import { CopyButton } from './CopyButton'
 import { EntryHistory } from './EntryHistory'
 import { EntryNotFound } from './EntryNotFound'
+import { PasswordStrength } from './PasswordStrength'
 import { SecretValue } from './SecretValue'
 import { captureSessionContext, isUnexplainedUnauthorized } from './vault-feedback'
 import { VaultError } from './vault-api'
@@ -43,7 +44,16 @@ function EntryDetail({ id }: { id: string }) {
     )
   }
 
-  const { title, login, password, additionalFields, createdAt, updatedAt } = entry.data
+  const {
+    title,
+    login,
+    password,
+    additionalFields,
+    createdAt,
+    updatedAt,
+    passwordScore,
+    passwordScoreDetail,
+  } = entry.data
   const fieldRows = Object.entries(additionalFields ?? {})
 
   async function moveToTrash() {
@@ -95,6 +105,8 @@ function EntryDetail({ id }: { id: string }) {
       )}
 
       <SecretValue label={t('vault.form.fields.password')} value={password} />
+
+      <PasswordStrength score={passwordScore} detail={passwordScoreDetail} />
 
       {fieldRows.length > 0 && (
         <section className="flex flex-col gap-2">

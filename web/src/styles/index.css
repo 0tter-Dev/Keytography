@@ -26,6 +26,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-accent-ink: var(--accent-ink);
   --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
 
@@ -81,6 +82,7 @@
 :root {
   --radius: 0.625rem;
   --success: oklch(0.7 0.17 150);
+  --warning: oklch(0.8 0.16 85);
   --destructive: oklch(0.62 0.23 27);
   --destructive-foreground: oklch(1 0 0);
 
