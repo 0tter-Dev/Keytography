@@ -45,7 +45,7 @@ Regra de dependência: `features/*` pode usar `components/*`, `lib/*`, `api/*`; 
 
 ## Estilo: tokens, nunca valores soltos
 
-1. **Só utilitários semânticos.** Componentes usam `bg-background`, `text-foreground`, `bg-surface`, `border-border`, `text-muted-foreground`, `bg-primary`/`text-primary-foreground`, `bg-destructive`... Nunca `bg-white`, `text-gray-700`, hex ou `oklch()` dentro de componentes.
+1. **Só utilitários semânticos.** Componentes usam `bg-background`, `text-foreground`, `bg-surface`, `border-border`, `text-muted-foreground`, `bg-primary`/`text-primary-foreground`, `bg-destructive`, `bg-success`, `bg-warning`... Nunca `bg-white`, `text-gray-700`, hex ou `oklch()` dentro de componentes.
 2. **Sem variantes `dark:`.** O tema troca os valores dos tokens (`data-theme` no `<html>`); o componente não sabe qual tema está ativo.
 3. **Sem CSS inline** (`style={{...}}`) nem arquivos de CSS por componente para ajustes pontuais. Se um padrão se repete, vira variante do componente. Única exceção aceita: injetar variáveis CSS que uma biblioteca de terceiros só expõe via `style` (ex.: `sonner`, em `components/ui/sonner.tsx`), apontando para os tokens.
 4. **Variantes tipadas com `cva`.** Um componente com aparências diferentes expõe `variant`/`size` (ver `components/ui/button.tsx`), em vez de receber `className` ad hoc em cada uso.

@@ -1,6 +1,6 @@
 ---
 id: keytography-010
-status: active
+status: review
 type: feat
 requires_pull_request: true
 expected_version_impact: patch
@@ -54,6 +54,14 @@ Exibir, na tela de detalhe de uma entrada de cofre, a nota de força e o detalha
 
 Ativado e aprovado pelo usuário em 2026-10-23, ao pedir explicitamente a ativação e a implementação deste plano (o próximo da fila do `ROADMAP.md`), depois da revisão registrada no PR #36. **A seção `Invariants And Failure Modes` (com `Known Limitations` e `Verification Matrix`) foi revisada contra a API real e aprovada pelo usuário em 2026-10-23 antes da ativação**, com as decisões: nota mostrada só no detalhe (sem pré-visualização nos formulários, sem endpoint novo nem avaliação no frontend), faixas 0–39 fraca, 40–69 média e 70–100 forte sempre com texto, e invariantes de nota nula, critério desconhecido e valor fora da faixa. Este plano não altera API, banco nem contrato (`expected_version_impact: patch`), não toca em criptografia, autenticação nem controle de acesso, e a única capability autorizada é `web-interface`.
 
+## Implementation Clarifications
+
+Ajustes de meio durante a implementação, sem reescrever o `Approval` (nenhum muda escopo, contrato ou política):
+
+- **Arredondamento antes da faixa** (decorrência da invariante "a informação não depende só de cor" e do critério de que o número e a faixa nunca discordem; decidido na implementação em 2026-10-23, sem consulta por ser detalhe de apresentação dentro do aprovado): a nota é arredondada para inteiro e limitada a 0–100 antes de definir a faixa e de ser exibida (39,6 vira 40 e "Média"); as fronteiras 39/40 e 69/70 valem para o inteiro exibido.
+- **Token de cor `warning`** (detalhe de implementação do plano aprovado, 2026-10-23): o tema só tinha `success` e `destructive`; a faixa "média" ganhou `--warning` nos valores comuns do tema (`styles/index.css`), usado como `bg-warning`. A cor só reforça o texto da faixa, então o contraste do token não carrega informação; a conferência do contraste da barra nos cinco temas fica para o `keytography-014` (revisão de contraste).
+- **Documentos além dos listados em `Documentation Updates`** (lacunas do plano, corrigidas na entrega): `docs/guides/web-frontend-conventions.md` (lista de utilitários semânticos de cor ganhou `bg-success` e `bg-warning`) e o `README.md` raiz, cujo Quick Start ainda dizia que a tela de cofre estava em desenvolvimento desde o `009` (corrigido junto com o Current Scope).
+
 ## Acceptance Criteria
 
 - O detalhe de uma entrada com senha fraca mostra a faixa "fraca", a nota e quais critérios não atendem; com senha forte, a faixa "forte" e a nota alta.
@@ -90,26 +98,33 @@ Invariantes (devem valer sempre):
 - **A nota é a do último salvamento:** o critério de reuso olha as outras contas no momento em que a entrada foi salva e não é recalculado quando outras contas mudam; um critério novo só vale para entradas antigas depois do recálculo retroativo do `Admin`.
 - **As faixas (40 e 70) são apresentação do cliente:** se o backend mudar a escala, as faixas precisam ser revistas junto.
 - A nota e o detalhamento só existem no detalhe; lista, lixeira e histórico não os mostram.
+- **A faixa é a da média da API e pode esconder um critério reprovado** (observado na verificação manual de 2026-10-23, **decisão do usuário pendente**): `abc` recebe 59 ("Média", com tamanho e variedade reprovados e reuso e previsibilidade com 100) e uma senha forte repetida de outra entrada recebe 75 ("Forte", com "Senha não reutilizada: Não atende"). O frontend não recalcula (invariante); os critérios reprovados aparecem logo abaixo, em texto.
 
 ## Verification Matrix
 
-| Invariante ou critério | Teste (a definir na implementação) | Prova de que o teste falha sem o comportamento |
+Testes: `password-strength.test.tsx` (componente e funções puras) e `vault-strength.test.tsx` (fluxos no detalhe). 23 mutações manuais, todas mortas pelos testes de `features/vault` (a mutação que o teste observou falhar vem na terceira coluna).
+
+| Invariante ou critério | Teste | Prova de que o teste falha sem o comportamento |
 | --- | --- | --- |
-| Nota nula é "Ainda não avaliada", nunca fraca nem forte | teste do componente e do detalhe com `passwordScore` nulo | mutação: tratar nulo como 0 |
-| Faixas e fronteiras (0, 39, 40, 69, 70, 100) | testes do componente por nota | mutações: trocar `<` por `<=` em cada limite |
-| Valor fora de 0 a 100 é limitado | teste com -5 e 150 | mutação: usar o valor sem limitar |
-| Rótulos legíveis; critério desconhecido com rótulo genérico | teste com os quatro critérios e com uma chave nova | mutação: exibir a chave técnica |
-| A nota exibida é a da senha salva | teste de fluxo: editar, salvar, ver o detalhe com a nota nova | mutação: reaproveitar o detalhe anterior |
-| O componente não recebe nem exibe a senha | teste de que a senha não aparece em nenhum atributo do medidor | mutação: incluir a senha no `aria-valuetext` |
-| Acessibilidade: `role="meter"` com valor e texto; estado em texto | teste por papel e nome | mutação: remover `role` ou o texto |
-| Formulários sem medidor | teste dos formulários | mutação: renderizar o componente no formulário |
-| Fim de sessão descarta a nota | teste com `signOut` na tela de detalhe | mutação: manter o estado |
+| Nota nula é "Ainda não avaliada", nunca fraca nem forte | componente (`null`, `undefined`, `NaN`) e detalhe com `passwordScore` nulo | mutação: nota ausente vira 0 |
+| Faixas e fronteiras (0, 39, 40, 69, 70, 100) | componente por nota (resumo, nome acessível e valor do medidor) e funções puras | mutações: `>` no lugar de `>=` nas duas fronteiras; fronteiras 71 e 41 |
+| Arredondamento antes da faixa; valor fora de 0 a 100 limitado | componente com 39,6, -5 e 150 | mutações: sem arredondar; sem limitar |
+| Rótulos legíveis; critério desconhecido com rótulo genérico | componente com os quatro critérios, uma chave nova e nota do critério fora da faixa | mutações: exibir a chave técnica; todo critério conhecido; nota do critério sem limite |
+| Só `passed` verdadeiro conta como "atende" | componente com `passed` não booleano | mutação: conversão por verdade (`Boolean`) |
+| A nota exibida é a da senha salva | fluxo: editar, salvar e ver o detalhe com a nota nova; reabrir o detalhe e ver a nota atual | mutação: detalhe com `gcTime`/`staleTime` de 60 s |
+| O componente não recebe nem exibe a senha | HTML da seção de força sem a senha nem o login; as props só têm nota e detalhamento (garantia por tipo) | sem mutação possível sem mudar a assinatura do componente (equivalente por construção) |
+| Acessibilidade: `role="meter"` com valor e texto; estado em texto | componente por papel e nome; barra com cor e largura da faixa | mutações: sem `role`; sem `aria-valuetext`; sem `aria-valuenow`; largura fixa; cores trocadas; sem resumo em texto; sem estado "atende"/"não atende" |
+| Formulários sem medidor | formulários de criar e editar | mutação: componente renderizado no formulário |
+| Detalhe sem o componente e detalhamento nulo | detalhe (forte, fraca) e componente com `detail` nulo | mutações: detalhe sem o componente; `Object.entries(null)` |
+| Sem chamadas além do detalhe; erro de carga sem indicador | fluxo com a lista de chamadas e detalhe com 500 | coberto pela mesma suíte (a ausência de chamada é uma asserção direta) |
+| Fim de sessão descarta a nota | fluxo com `signOut` na tela de detalhe | comportamento herdado do `SessionController`/`RequireAuth` do `017` (a asserção falha se o detalhe sobreviver) |
 
 ## Documentation Updates
 
 - `docs/capabilities/web-interface/README.md`: documentar o indicador de força no detalhe da entrada, as faixas e as limitações (sem pré-visualização, nota do último salvamento).
 - `docs/guides/running-locally.md`: acrescentar ao roteiro "Verificando o cofre na interface web" a conferência da força com senha fraca e forte.
-- `README.md` (raiz): Current Scope passa a listar o indicador de força de senha na interface web; Quick Start e Stack: constatação deliberada de que não mudam.
+- `README.md` (raiz): Current Scope passa a listar o indicador de força de senha na interface web; o Quick Start também é corrigido (dizia que as telas de cofre ainda estavam em desenvolvimento desde o `009`); Stack: constatação deliberada de que não muda.
+- `docs/guides/web-frontend-conventions.md`: utilitários de cor `bg-success` e `bg-warning` (lacuna do plano, ver `Implementation Clarifications`).
 - `docs/STATUS.md`: refletir o novo status.
 
 ## Outcome

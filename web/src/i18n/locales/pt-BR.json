@@ -211,6 +211,29 @@
       "done": "Copiado. A área de transferência será limpa em cerca de {{seconds}} segundos.",
       "unavailable": "A área de transferência não está disponível neste navegador ou neste endereço."
     },
+    "strength": {
+      "title": "Força da senha",
+      "notEvaluated": "Ainda não avaliada",
+      "meterLabel": "Força da senha",
+      "summary": "{{band}} · {{score}} de 100",
+      "valueText": "{{band}}, {{score}} de 100",
+      "bands": {
+        "weak": "Fraca",
+        "medium": "Média",
+        "strong": "Forte"
+      },
+      "criteriaTitle": "Critérios",
+      "passed": "Atende",
+      "failed": "Não atende",
+      "criterionScore": "nota {{score}}",
+      "criteria": {
+        "length": "Tamanho",
+        "entropy": "Variedade de caracteres",
+        "reuse": "Senha não reutilizada",
+        "complexity": "Previsibilidade",
+        "unknown": "Critério adicional"
+      }
+    },
     "history": {
       "empty": "A senha desta entrada nunca foi trocada.",
       "changedAt": "Trocada em {{date}}",

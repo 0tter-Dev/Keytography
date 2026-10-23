@@ -200,7 +200,8 @@ Roteiro repetível (o usado na verificação manual do `keytography-009`), com a
 5. **Mover para a lixeira** (o diálogo pede confirmação; **Cancelar** não move nada), abra **Lixeira**, **Restaurar** (a entrada volta à lista) e mova de novo; **Excluir definitivamente** pede digitar `EXCLUIR` e a entrada some de vez.
 6. No painel do navegador, confira que **Application → Local/Session storage** não tem a senha e que a URL é só `/vault/<id>`.
 7. Reinício da API: com a API rodando, abra o detalhe de uma entrada, pare e suba a API de novo e clique em **Editar**: o servidor responde 401 ao buscar o detalhe por falta da DEK em cache (a edição tem consulta própria, então o erro aparece já ao abrir) e a interface leva ao login com o aviso de sessão expirada, sem mostrar a senha.
-8. Troca de conta entre abas: na aba 1 entre como A e abra uma entrada; na aba 2 entre como B; ao renovar a sessão (ou numa nova chamada), a aba 1 avisa e volta ao início, e a senha de A não permanece na tela.
+8. Força da senha (`keytography-010`): crie uma entrada com senha curta e simples (ex.: `abc`) e abra o detalhe: a faixa aparece como **Fraca**, o medidor está quase vazio e os critérios que reprovam mostram **Não atende**; edite para uma senha longa e variada (ex.: 20 caracteres com letras, números e símbolos) e salve: o detalhe passa a **Forte** com a nota nova (nunca a anterior). Os formulários de criar e editar não mostram a força. No inspetor de acessibilidade, o medidor tem o papel "meter" com o valor e a faixa.
+9. Troca de conta entre abas: na aba 1 entre como A e abra uma entrada; na aba 2 entre como B; ao renovar a sessão (ou numa nova chamada), a aba 1 avisa e volta ao início, e a senha de A não permanece na tela.
 
 **Scripts úteis (em `web/`):**
 
